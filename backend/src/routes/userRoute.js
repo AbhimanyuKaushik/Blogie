@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || "mysecretkey";
+const JWT_SECRET = process.env.JWT_TOKEN || "mysecretkey";
 
 router.post("/register",async(req,res)=>{
     try{
@@ -45,3 +45,5 @@ router.post("/login",async(req,res)=>{
         res.status(500).json({error:err.message});
     }
 });
+
+module.exports= router;
