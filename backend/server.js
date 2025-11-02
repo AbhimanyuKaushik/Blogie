@@ -1,7 +1,7 @@
+const postRoutes = require('./src/routes/postRoute.js');
 const express = require('express');
-const dotenv = require('dotenv');
 const mongoose = require('mongoose');
-
+const dotenv = require('dotenv');
 dotenv.config();
 
 const app = express();
@@ -15,6 +15,8 @@ mongoose.connect(process.env.MONGO_URL)
 app.get('/', (req, res) => {
   res.send('Backend in Running!');
 });
+
+app.use('/api/posts',postRoutes);
 
 app.listen(process.env.PORT || 5000, () => {
     console.log(`Server is running on port ${process.env.PORT || 5000}`);
