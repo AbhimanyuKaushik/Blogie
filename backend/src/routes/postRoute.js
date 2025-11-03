@@ -6,7 +6,7 @@ const router = express.Router();
 // Create a new post
 router.post("/", async (req, res) => {
   try {
-    const { title, content, author, tags } = req.body; // ✅ tags added here
+    const { title, content, author, tags } = req.body;
     const newPost = new Post({ title, content, author, tags });
 
     await newPost.save();
