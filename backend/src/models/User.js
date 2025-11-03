@@ -14,7 +14,7 @@ const UserSchema = new mongoose.Schema({
     required: true,
     minlength: 6,
   },
-  name: {
+  username: {
     type: String,
     required: true,
     trim: true,
@@ -51,4 +51,4 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-models.exports = mongoose.model("User", UserSchema);
+module.exports = mongoose.model("User", UserSchema);
