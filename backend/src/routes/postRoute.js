@@ -10,7 +10,9 @@ router.post("/", async (req, res) => {
     const newPost = new Post({ title, content, author, tags });
 
     await newPost.save();
-    res.status(201).json({ message: "Post created successfully", post: newPost });
+    res
+      .status(201)
+      .json({ message: "Post created successfully", post: newPost });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -34,7 +36,9 @@ router.get("/:id", async (req, res) => {
 
     res.status(200).json(post);
   } catch (err) {
-    res.status(500).json({ message: "Error fetching post", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching post", error: err.message });
   }
 });
 
@@ -44,11 +48,14 @@ router.put("/:id", async (req, res) => {
     const updatedPost = await Post.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
-    if (!updatedPost) return res.status(404).json({ message: "Post not found" });
+    if (!updatedPost)
+      return res.status(404).json({ message: "Post not found" });
 
     res.json({ message: "Post updated successfully", post: updatedPost });
   } catch (err) {
-    res.status(500).json({ message: "Error updating post", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error updating post", error: err.message });
   }
 });
 
@@ -56,12 +63,53 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const deletedPost = await Post.findByIdAndDelete(req.params.id);
-    if (!deletedPost) return res.status(404).json({ message: "Post not found" });
+    if (!deletedPost)
+      return res.status(404).json({ message: "Post not found" });
 
     res.status(200).json({ message: "Post deleted successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Error deleting post", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error deleting post", error: err.message });
   }
 });
 
-module.exports = router; 
+// Like/Unlike a post
+router.post("/:id/act", async (req, res) => {
+  try {
+    const {action} = req.body;
+
+    if (action != "Like" && action != "Unlike") {
+      return res
+        .status(400)
+        .json({ message: "Invalid action. Use 'Like' or 'Unlike'." });
+    }
+
+    const counter = action === "Like" ? 1 : -1;
+
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { likesCount: counter } },
+      { new: true }
+    );
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    if (post.likesCount < 0) {
+      post.likesCount = 0;
+      await post.save();
+    }
+
+    res
+      .status(200)
+      .json({
+        message: `Post ${action === "Like" ? "liked" : "unliked"} successfully`,
+        likesCount: post.likesCount,
+      });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error updating like status", error: err.message });
+  }
+});
+
+module.exports = router;
