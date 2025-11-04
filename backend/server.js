@@ -3,7 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const userRoutes = require('./src/routes/userRoute.js');
-
+const auth = require('./src/middleware/auth.js');
 dotenv.config();
 
 const app = express();
@@ -18,7 +18,7 @@ app.get('/', (req, res) => {
   res.send('Backend in Running!');
 });
 
-app.use('/api/posts',postRoutes);
+app.use('/api/posts', postRoutes);
 
 app.use('/api/users',userRoutes);
 

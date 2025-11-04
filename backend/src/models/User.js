@@ -39,6 +39,19 @@ const UserSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  following:[{
+    type:mongoose.Schema.Types.ObjectId,
+    ref:"User",
+  }],
+  followers:[{
+    type:mongoose.Schema.Types.ObjectId,
+    ref:"User",
+  }]
+});
+
+UserSchema.pre("save",async function(next){
+  this.password =  await bcrypt.hash(this.password, 10);
+  next();
 });
 
 module.exports = mongoose.model("User", UserSchema);

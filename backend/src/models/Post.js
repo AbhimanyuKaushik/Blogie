@@ -10,7 +10,8 @@ const postSchema = new mongoose.Schema({
     required: true,
   },
   author: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref:"User",
     default: "Anonymous",
   },
   tags: {
@@ -30,5 +31,7 @@ const postSchema = new mongoose.Schema({
     default: 0,
   }
 });
+
+postSchema.index({author:1,createdAt:-1});
 
 module.exports = mongoose.model("Post", postSchema);
