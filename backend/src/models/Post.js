@@ -12,7 +12,7 @@ const postSchema = new mongoose.Schema({
   author: {
     type: mongoose.Schema.Types.ObjectId,
     ref:"User",
-    default: "Anonymous",
+    required: true,
   },
   tags: {
     type: [String],
