@@ -12,10 +12,12 @@ router.post("/", auth, async (req, res) => {
     const { title, content, tags } = req.body;
     const newPost = new Post({ title, content, author: req.user.id, tags });
 
+    //New post and its id stored in session
+    req.session.lastAction="createdPost"
+    req.session.lastPostId=newPost._id;
+
     await newPost.save();
-    res
-      .status(201)
-      .json({ message: "Post created successfully", post: newPost });
+    res.status(201).json({ message: "Post created successfully", post: newPost });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -99,6 +101,10 @@ router.post("/:id/like", auth, async (req, res) => {
 
     //Update count
     await Post.findByIdAndUpdate(id, { $inc: { likesCount: 1 } });
+    
+    //Like and post Id stored in session
+    req.session.lastAction = "liked_post";
+    req.session.lastPostId = id;
 
     res.status(200).json({
       message: "Post liked successfully",
@@ -186,6 +192,10 @@ router.post("/:id/comment", auth, async (req, res) => {
       parentId: validatedParentId
     });
     await newComment.save();
+
+    //Comment and post Id stored in session
+    req.session.lastAction = "commented on post";
+    req.session.postId = id;
 
     // Increment count in Post
     post.commentCount += 1;

@@ -8,6 +8,7 @@ dotenv.config();
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_TOKEN;
+//register 
 router.post("/register",async(req,res)=>{
     try{
         const{username,email,password} = req.body;
@@ -26,15 +27,18 @@ router.post("/register",async(req,res)=>{
         res.status(500).json({error:err.message});
     }
 })
-
+//login
 router.post("/login",async(req,res)=>{
     try{
         const{username,email,password} = req.body;
-        req.session.user = username;
         const user = await User.findOne({email});
         if(!user) return res.status(401).json({message:"Invalid credentials"});
         const isMatch = await bcrypt.hashSync(password,user.password);
         if(!isMatch) return res.status(400).json({message:"Invalid credentials"});
+        req.session.user = {
+            id: user._id,
+            username:user.username
+        };
         const token = jwt.sign(
             {id:user._id,username:user.username},
             JWT_SECRET,
@@ -47,8 +51,7 @@ router.post("/login",async(req,res)=>{
     }
 });
 
-
-
+//logout
 router.post("/logout",async(req,res)=>{
     req.session.destroy()
     return res.json({message:"Logged out"})

@@ -39,6 +39,15 @@ const UserSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  location:{
+      type:String,
+      default:"",
+  },
+  social:{
+      instagram:{type:String,default:""},
+      twitter:{type:String,default:""},
+      linkedin:{type:String,default:""},
+  },
   following:[{
     type:mongoose.Schema.Types.ObjectId,
     ref:"User",

@@ -1,14 +1,16 @@
 const express = require("express")
 const router = express.Router();
-
-const Profile = require("../models/Profile")
 const User = require("../models/User")
 
-router.post("/profile",async (req,res) =>{
+//profile creation and fetching of existing one
+router.post("/me",async (req,res) =>{
     try{
-        const{userId,bio,location,social} = req.body;
-        let profile = await Profile.findOne({user:userId});
+        const{userId,username,age,profileImage,bio,location,social} = req.body;
+        let profile = await User.findOne({user:userId});
         if(profile){
+            profile.profileImage = profileImage || profile.profileImage;
+            profile.username = username || username.age;
+            profile.age = age || profile.age;
             profile.bio = bio || profile.bio;
             profile.location = location || profile.location;
             profile.social = social || profile.social;
@@ -18,6 +20,8 @@ router.post("/profile",async (req,res) =>{
         const newProfile = new Profile({
             user:userId,
             bio,
+            age,
+            profileImage,            
             location,
             social,
         });
@@ -29,8 +33,12 @@ router.post("/profile",async (req,res) =>{
     }
 });
 
-router.get("/profile/:userId", async(req,res)=>{
-    const profile = await Profile.findone({user:req.params.userId})
+//
+router.get("/me/:userId", async(req,res)=>{
+    const profile = await User.findone({user:req.params.userId})
     .populate("user","username email");
+    if(!profile)
+        return res.status(404).json({message:"Profile not found"});
+    res.json(profile);
 })
 module.exports = router;
