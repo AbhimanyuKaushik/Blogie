@@ -1,2 +1,5 @@
-backend/node_modules/
-backend/.env
+node_modules/
+npm-debug.log*
+.env
+dist/
+build/

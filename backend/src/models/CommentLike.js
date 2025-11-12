@@ -5,7 +5,7 @@ const commentLikeSchema = new mongoose.Schema({
   comment: { type: mongoose.Schema.Types.ObjectId, ref: "Comment", required: true },
 }, { timestamps: true })
 
-// Prevent duplicates + fast lookup
+// Prevent duplicates 
 commentLikeSchema.index({ user: 1, comment: 1 }, { unique: true });
 
 module.exports = mongoose.model("CommentLike", commentLikeSchema);

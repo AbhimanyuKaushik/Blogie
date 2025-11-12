@@ -55,7 +55,15 @@ const UserSchema = new mongoose.Schema({
   followers:[{
     type:mongoose.Schema.Types.ObjectId,
     ref:"User",
-  }]
+  }],
+  savedPosts:[{
+    type:mongoose.Schema.Types.ObjectId,
+    ref:"Post",
+  }],
+  savedCount: { 
+    type: Number, 
+    default: 0 
+  },
 });
 
 UserSchema.pre("save",async function(next){
