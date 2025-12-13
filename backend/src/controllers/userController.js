@@ -1,8 +1,7 @@
 const bcrypt = require("bcrypt");
 const User = require("../models/User.js");
-const dotenv = require("dotenv");
 const Post = require("../models/Post.js");
-dotenv.config();
+const mongoose = require("mongoose");
 
 exports.registerUser = async (req, res) => {
   try {
@@ -29,7 +28,6 @@ exports.loginUser = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log(password, user.password, isMatch);
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
 
@@ -107,6 +105,90 @@ exports.searchUsers = async (req, res) => {
     });
 
     res.json({ users, total, hasMore: parseInt(skip) + users.length < total });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.followUser = async (req, res) => {
+  try {
+    const userId = req.session.user._id.toString();
+    const targetUserId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ message: "Invalid User ID" });
+    }
+
+    if (userId === targetUserId) {
+      return res.status(400).json({ message: "You cannot follow yourself" });
+    }
+
+    const targetUser = await User.findById(targetUserId);
+
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const alreadyFollowing = await User.findOne({
+      _id: userId,
+      following: targetUserId,
+    });
+
+    if (alreadyFollowing) {
+      return res
+        .status(400)
+        .json({ message: "You are already following this user" });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { following: targetUserId },
+    });
+    await User.findByIdAndUpdate(targetUserId, {
+      $addToSet: { followers: userId },
+    });
+
+    res.json({ message: "User followed successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.unfollowUser = async (req, res) => {
+  try {
+    const userId = req.session.user._id;
+    const targetUserId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ message: "Invalid User ID" });
+    }
+
+    if (userId === targetUserId) {
+      return res.status(400).json({ message: "You cannot unfollow yourself" });
+    }
+
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isFollowing = await User.findOne({
+      _id: userId,
+      following: targetUserId,
+    });
+
+    if (!isFollowing) {
+      return res
+        .status(400)
+        .json({ message: "You are not following this user" });
+    }
+    await User.findByIdAndUpdate(userId, {
+      $pull: { following: targetUserId },
+    });
+
+    await User.findByIdAndUpdate(targetUserId, {
+      $pull: { followers: userId },
+    });
+    res.status(200).json({ message: "User unfollowed successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
