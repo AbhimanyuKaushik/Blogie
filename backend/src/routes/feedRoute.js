@@ -1,43 +1,61 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const Post = require("../models/Post");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const router = express.Router();
 
-router.get("/feed",auth, async(req,res)=>{
-    try {
-        const userId = req.user.id;
-        const {limit = 10, skip = 0} = req.query;
+router.get("/", auth, async (req, res) => {
+  try {
+    const userId = req.session.user._id;
+    let limit = parseInt(req.query.limit, 10) || 10;
+    let skip = parseInt(req.query.skip, 10) || 0;
 
-        // Get current user's following list
-        const currentUser = await User.findById(userId).select("following");
-        if(!currentUser) return res.status(404).json({message:"User not found"});
+    // Clamp values
+    if (limit < 1) limit = 1;
+    if (limit > 100) limit = 100;
+    if (skip < 0) skip = 0;
 
-        const followingIds = currentUser.following.map(id=>id.toString());
+    // Get current user's following list + interests
+    const currentUser = await User.findById(userId).select("following interests");
+    if (!currentUser) return res.status(404).json({ message: "User not found" });
 
-        // Include current user + poeple they follow
-        const feedAuthorIds = [userId, ...followingIds];
+    const following = Array.isArray(currentUser.following) ? currentUser.following : [];
 
-        // Fetch posts from these authors
-        const posts = await Post.find({ author: {$in: feedAuthorIds}})
-            .populate("author","username profileImage")
-            .sort({createdAt:-1})
-            .skip(parseInt(skip))
-            .limit(parseInt(limit));
+    // Exclude current user: we only want other users' posts
+    const feedAuthorIds = following.filter(id => id.toString() !== userId.toString());
 
-        // Total count for pagination
-        const total = await Post.countDocuments({ author: { $in: feedAuthorIds}});
-
-        res.json({
-            posts,
-            total,
-            hasMore: parseInt(skip) + posts.length < total,
-        });
-    } catch (error) {
-        console.error("Feed Error:",error);
-        res.status(500).json({ error: error.message})
+    if (feedAuthorIds.length === 0) {
+      return res.json({ posts: [], total: 0, hasMore: false });
     }
+
+    // If user has interests, restrict posts to those matching at least one interest (post tags)
+    const interests = Array.isArray(currentUser.interests) ? currentUser.interests : [];
+    const tagFilter = interests.length ? { tags: { $in: interests } } : {};
+
+    const query = {
+      author: { $in: feedAuthorIds },
+      ...tagFilter,
+    };
+
+    // Run queries in parallel
+    const [posts, total] = await Promise.all([
+      Post.find(query)
+        .populate("author", "username profileImage")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Post.countDocuments(query),
+    ]);
+
+    res.json({
+      posts,
+      total,
+      hasMore: skip + posts.length < total,
+    });
+  } catch (error) {
+    console.error("Feed Error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

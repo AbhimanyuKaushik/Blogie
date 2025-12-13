@@ -1,13 +1,8 @@
-const express = require("express");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const User = require("../models/User.js");
 const dotenv = require("dotenv");
-const auth = require("../middleware/auth.js");
 const Post = require("../models/Post.js");
 dotenv.config();
-
-const JWT_SECRET = process.env.JWT_TOKEN;
 
 exports.registerUser = async (req, res) => {
   try {
@@ -15,7 +10,7 @@ exports.registerUser = async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser)
       return res.status(400).json({ message: "User already exists" });
-    const hashedPassword = await bcrypt.hashSync(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new User({
       username,
       email,
@@ -30,23 +25,23 @@ exports.registerUser = async (req, res) => {
 
 exports.loginUser = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
-    req.session.user = username;
+    const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
-    const isMatch = await bcrypt.hashSync(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password);
+    console.log(password, user.password, isMatch);
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
-    const token = jwt.sign(
-      { id: user._id, username: user.username },
-      JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+
+    req.session.user = {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+    };
 
     res.json({
       message: "Logged in successfully",
-      token,
-      username: user.username,
+      username: req.session.user.username,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -60,8 +55,9 @@ exports.logoutUser = async (req, res) => {
 
 exports.savedPosts = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.session.user._id;
     const { limit = 10, page = 1 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit); // Missing line
 
     const user = await User.findById(userId).select("savedPosts savedCount");
     const total = user.savedPosts.length;
@@ -78,6 +74,39 @@ exports.savedPosts = async (req, res) => {
       savedCount: user.savedCount,
       hasMore: skip + savedPosts.length < total,
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.searchUsers = async (req, res) => {
+  try {
+    const { query, limit = 10, skip = 0 } = req.query;
+
+    if (!query || query.trim().length < 2) {
+      return res
+        .status(400)
+        .json({ message: "Query must be at least 2 characters" });
+    }
+
+    const users = await User.find({
+      $or: [
+        { username: { $regex: query, $options: "i" } },
+        { email: { $regex: query, $options: "i" } },
+      ],
+    })
+      .select("-password -email") // Don't expose email in search results
+      .skip(parseInt(skip))
+      .limit(parseInt(limit));
+
+    const total = await User.countDocuments({
+      $or: [
+        { username: { $regex: query, $options: "i" } },
+        { email: { $regex: query, $options: "i" } },
+      ],
+    });
+
+    res.json({ users, total, hasMore: parseInt(skip) + users.length < total });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

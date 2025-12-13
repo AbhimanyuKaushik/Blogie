@@ -1,44 +1,71 @@
-const express = require("express")
-const router = express.Router();
-const User = require("../models/User")
+const express = require("express");
+const auth = require("../middleware/auth");
+const User = require("../models/User");
 
-//profile creation and fetching of existing one
-router.post("/me",async (req,res) =>{
-    try{
-        const{userId,username,age,profileImage,bio,location,social} = req.body;
-        let profile = await User.findOne({user:userId});
-        if(profile){
-            profile.profileImage = profileImage || profile.profileImage;
-            profile.username = username || username.age;
-            profile.age = age || profile.age;
-            profile.bio = bio || profile.bio;
-            profile.location = location || profile.location;
-            profile.social = social || profile.social;
-            await profile.save();
-            return res.json({message:"Profile updated",profile})
-        }
-        const newProfile = new Profile({
-            user:userId,
-            bio,
-            age,
-            profileImage,            
-            location,
-            social,
-        });
-        await newProfile.save();
-        res.status(201).json({message:"Profile created",profile:newProfile});
-    } catch(err){
-        console.error("Profile error:",err);
-        res.status(500).json({error: err.essage});
+const router = express.Router();
+
+// Get current user's profile
+router.get("/me", auth, async (req, res) => {
+  try {
+    const userId = req.session.user._id;
+    const user = await User.findById(userId).select("-password");
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    res.json({ message: "Profile retrieved", profile: user });
+  } catch (err) {
+    console.error("Profile error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-//
-router.get("/me/:userId", async(req,res)=>{
-    const profile = await User.findone({user:req.params.userId})
-    .populate("user","username email");
-    if(!profile)
-        return res.status(404).json({message:"Profile not found"});
-    res.json(profile);
-})
+// Get any user's public profile
+router.get("/:userId", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select(
+      "username profileImage bio age location social interests followers following"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "Profile retrieved", profile: user });
+  } catch (err) {
+    console.error("Profile error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update current user's profile
+router.put("/me", auth, async (req, res) => {
+  try {
+    const userId = req.session.user._id;
+    const { username, age, profileImage, bio, location, social, interests } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update fields if provided
+    if (username) user.username = username;
+    if (age !== undefined) user.age = age;
+    if (profileImage) user.profileImage = profileImage;
+    if (bio) user.bio = bio;
+    if (location) user.location = location;
+    if (social) user.social = { ...user.social, ...social };
+    if (interests) user.interests = interests;
+
+    await user.save();
+
+    res.json({ message: "Profile updated successfully", profile: user });
+  } catch (err) {
+    console.error("Profile error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
