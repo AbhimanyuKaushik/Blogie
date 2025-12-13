@@ -19,4 +19,10 @@ router.get("/search", userController.searchUsers);
 // Get User's saved posts
 router.get("/me/saved", auth, userController.savedPosts);
 
+// Follow User
+router.post("/:id/follow", auth, userController.followUser);
+
+// Unfollow User
+router.post("/:id/unfollow", auth, userController.unfollowUser);
+
 module.exports = router;

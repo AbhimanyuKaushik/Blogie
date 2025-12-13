@@ -53,7 +53,11 @@ router.get("/", auth, async (req, res) => {
       hasMore: skip + posts.length < total,
     });
   } catch (error) {
-    console.error("Feed Error:", error);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Feed Error:", error);
+    } else {
+      console.error("Feed Error:", error.message);
+    }
     res.status(500).json({ error: error.message });
   }
 });
