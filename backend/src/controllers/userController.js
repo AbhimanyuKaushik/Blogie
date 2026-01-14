@@ -6,19 +6,48 @@ const mongoose = require("mongoose");
 exports.registerUser = async (req, res) => {
   try {
     const { username, email, password } = req.body;
+
     const existingUser = await User.findOne({ email });
-    if (existingUser)
+    if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = new User({
+
+    const newUser = await User.create({
       username,
       email,
       password: hashedPassword,
+      isOnboarded: false,
     });
-    await newUser.save();
+
+    req.session.user = {
+      _id: newUser._id,
+      username: newUser.username,
+      email: newUser.email,
+      profileImage: newUser.profileImage || "",
+      isOnboarded: false,
+    };
+
     res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+exports.completeOnboarding = async (req, res) => {
+  try {
+    const userId = req.session.user._id;
+    const updates = {
+      ...req.body,
+      isOnboarded: true,
+    };
+    const user = await User.findByIdAndUpdate(userId, updates, {
+      new: true,
+    }).select("-password");
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -35,6 +64,8 @@ exports.loginUser = async (req, res) => {
       _id: user._id,
       username: user.username,
       email: user.email,
+      profileImage: user.profileImage || null,
+      isOnboarded: user.isOnboarded,
     };
 
     res.json({
@@ -46,9 +77,15 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-exports.logoutUser = async (req, res) => {
-  req.session.destroy();
-  return res.json({ message: "Logged out" });
+exports.logoutUser = (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ message: "Logout failed" });
+    }
+
+    res.clearCookie("medium.sid");
+    return res.json({ message: "Logged out successfully" });
+  });
 };
 
 exports.savedPosts = async (req, res) => {

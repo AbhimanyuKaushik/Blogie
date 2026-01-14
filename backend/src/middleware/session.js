@@ -1,8 +1,6 @@
 const session = require("express-session");
 const connectMongo = require("connect-mongo");
 
-// Create a store that works with both connect-mongo v4+ (exports .create)
-// and older versions (require returns a factory function or constructor).
 const storeOptions = {
   mongoUrl: process.env.MONGO_URL,
   url: process.env.MONGO_URL,
@@ -14,20 +12,19 @@ const storeOptions = {
 
 let store;
 try {
-  // connect-mongo v4+: module exports an object with `create` function
   if (connectMongo && typeof connectMongo.create === "function") {
     store = connectMongo.create(storeOptions);
   }
-  // ESM->CJS default interop: require may return { default: { create: fn } }
+  
   else if (connectMongo && connectMongo.default && typeof connectMongo.default.create === "function") {
     store = connectMongo.default.create(storeOptions);
   }
-  // Older connect-mongo (v2/v3): require('connect-mongo')(session) returns a factory
+  
   else if (typeof connectMongo === "function") {
     const MongoStoreFactory = connectMongo(session);
     store = new MongoStoreFactory(storeOptions);
   }
-  // Older connect-mongo with default export as function
+  
   else if (connectMongo && typeof connectMongo.default === "function") {
     const MongoStoreFactory = connectMongo.default(session);
     store = new MongoStoreFactory(storeOptions);

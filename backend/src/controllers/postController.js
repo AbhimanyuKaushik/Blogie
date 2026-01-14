@@ -191,7 +191,7 @@ exports.getPeopleWhoLikedPost = async (req, res) => {
   }
 };
 
-// --------------------- COMMENTS ---------------------
+// --------------------- ADD COMMENT ---------------------
 exports.addComment = async (req, res) => {
   try {
     const { postId } = req.params;
