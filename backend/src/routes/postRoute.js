@@ -7,7 +7,7 @@ const router = express.Router();
 // CRUD Operations for Posts
 
 router.post("/", auth, postController.createPost);
-router.get("/", auth, postController.getAllPosts);
+router.get("/", postController.getAllPosts);
 router.get("/search", postController.searchPosts);
 router.get("/:postId", auth, postController.getPostById);
 router.put("/:postId", auth, postController.updatePost);

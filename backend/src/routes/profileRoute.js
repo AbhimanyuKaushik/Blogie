@@ -1,7 +1,7 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const User = require("../models/User");
-
+const userController = require("../controllers/userController");
 const router = express.Router();
 
 // Get current user's profile
@@ -9,7 +9,7 @@ router.get("/me", auth, async (req, res) => {
   try {
     const userId = req.session.user._id;
     const user = await User.findById(userId).select("-password");
-    
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -40,10 +40,11 @@ router.get("/:userId", async (req, res) => {
 });
 
 // Update current user's profile
-router.put("/me", auth, async (req, res) => {
+router.patch("/me", auth, async (req, res) => {
   try {
     const userId = req.session.user._id;
-    const { username, age, profileImage, bio, location, social, interests } = req.body;
+    const { username, age, profileImage, bio, location, social, interests } =
+      req.body;
 
     const user = await User.findById(userId);
     if (!user) {
@@ -67,5 +68,8 @@ router.put("/me", auth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Onboarding Completion
+router.patch("/onboarding", auth, userController.completeOnboarding);
 
 module.exports = router;

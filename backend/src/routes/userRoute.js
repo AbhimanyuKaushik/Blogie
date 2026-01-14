@@ -4,14 +4,8 @@ const userController = require("../controllers/userController.js");
 
 const router = express.Router();
 
-// Register User
-router.post("/register", userController.registerUser);
-
-// Login User
-router.post("/login", userController.loginUser);
-
-// Logout User
-router.post("/logout", auth, userController.logoutUser);
+// Onboarding Completion
+router.patch("/onboarding", auth, userController.completeOnboarding);
 
 // Search Users
 router.get("/search", userController.searchUsers);
