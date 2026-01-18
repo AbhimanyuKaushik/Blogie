@@ -4,4 +4,5 @@ export type User = {
   email?: string;
   profileImage?: string;
   role?: "user" | "admin";
+  interests?: string[];
 };
