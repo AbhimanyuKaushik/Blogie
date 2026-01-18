@@ -27,15 +27,12 @@ export default function OnboardingPage() {
       body: JSON.stringify(form),
     });
 
-    router.push("/feed");
+    router.push("/Feed");
   };
 
   return (
     <div className="max-w-xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">Tell us a bit about yourself</h1>
-
-      {/* form inputs */}
-
       <button
         onClick={submit}
         className="mt-6 bg-green-600 text-white px-4 py-2"

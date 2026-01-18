@@ -5,7 +5,6 @@ import {
   Home,
   Bookmark,
   User,
-  FileText,
   BarChart2,
   Users,
 } from "lucide-react";
@@ -17,7 +16,6 @@ function Sidebar() {
         <SidebarItem icon={<Home size={18} />} label="Home" active />
         <SidebarItem icon={<Bookmark size={18} />} label="Library" />
         <SidebarItem icon={<User size={18} />} label="Profile" />
-        <SidebarItem icon={<FileText size={18} />} label="Posts" />
         <SidebarItem icon={<BarChart2 size={18} />} label="Stats" />
       </nav>
 

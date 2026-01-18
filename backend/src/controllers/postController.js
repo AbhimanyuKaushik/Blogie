@@ -13,7 +13,7 @@ exports.createPost = async (req, res) => {
       title,
       content,
       author: req.session.user._id,
-      tags,
+      tags: tags || [],
     });
 
     await newPost.save();
