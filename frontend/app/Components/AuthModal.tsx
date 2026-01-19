@@ -70,7 +70,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     <div className="login-popup fixed inset-0 z-50 bg-[#00000090] grid">
       <form
         onSubmit={handleSubmit}
-        className="login-popup-container place-self-center bg-white p-6 rounded-lg flex flex-col gap-4 w-[360px]"
+        className="login-popup-container place-self-center bg-white p-6 rounded-lg flex flex-col gap-4"
       >
         <div className="flex justify-between items-center text-xl font-bold">
           <h2>{currState}</h2>

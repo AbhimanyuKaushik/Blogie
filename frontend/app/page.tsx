@@ -50,7 +50,7 @@ export default function Home() {
         {loading ? (
           <div className="text-center mt-24 text-gray-500">Loading...</div>
         ) : filteredPosts.length === 0 ? (
-          posts.length === 0 ? <EmptyFeed /> : posts.map((post: Post) => <PostCard key={post._id} post={post} />)
+           <EmptyFeed />
         ) : (
           filteredPosts.map((post: Post) => <PostCard key={post._id} post={post} />)
         )}
