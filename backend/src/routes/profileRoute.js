@@ -3,6 +3,8 @@ const auth = require("../middleware/auth");
 const User = require("../models/User");
 const userController = require("../controllers/userController");
 const router = express.Router();
+const upload = require("../middleware/multer");
+const cloudinary = require("../config/cloudinary");
 
 // Get current user's profile
 router.get("/me", auth, async (req, res) => {
@@ -68,6 +70,25 @@ router.patch("/me", auth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+router.patch("/upload-profile-image", auth, upload.single("image"),async(req,res)=>{
+  try{
+    const userId = req.session.user._id;
+    const user = await User.findById(userId);
+    if(!user){
+      return res.status(404).json({message:"User not found"});
+    }
+    user.profileImage=req.file.path;
+    await user.save();
+    res.json({
+      message:"Profile Updated!",
+      profileImage:user.profileImage,
+    });
+  } catch(err){
+    console.error("Upload error:",err);
+    res.status(500).json({error:err.message});
+  }
+})
 
 // Onboarding Completion
 router.patch("/onboarding", auth, userController.completeOnboarding);

@@ -67,7 +67,7 @@ function Navbar({ onMenuClick }: NavbarProps) {
           </button>
         ) : (
           <div className="relative">
-            <Image
+            <img
               src={user.profileImage || "/default-avatar.png"}
               alt="User avatar"
               width={64}

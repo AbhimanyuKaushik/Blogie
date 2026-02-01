@@ -7,7 +7,7 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { User } from "../../Types/UserTypes";
+import { User } from "../Types/UserTypes";
 
 type AuthContextType = {
   user: User | null;

@@ -1,5 +1,5 @@
 import { Bookmark, Heart, MessageCircle } from "lucide-react";
-import { Post } from "../../Types/PostTypes";
+import { Post } from "../Types/PostTypes";
 
 export default function PostCard({ post }: { post: Post }) {
   return (

@@ -36,6 +36,7 @@ export default function OnboardingPage() {
 
   const [stage, setStage] = useState(1);
   const [form, setForm] = useState({
+    name:"",
     age: "",
     bio: "",
     location: "",
@@ -46,6 +47,13 @@ export default function OnboardingPage() {
       linkedin: "",
     },
   });
+  const handleChange = (e) =>{
+    const{name,value} = e.target;
+    setForm((prev)=>({
+      ...prev,
+      [name]:value,
+    }));
+  }
 
   const toggleInterest = (interest: string) => {
     setForm((prev) => {
@@ -70,8 +78,7 @@ export default function OnboardingPage() {
       credentials: "include",
       body: JSON.stringify(form),
     });
-
-    router.push("/Feed");
+    router.push("/");
   };
 
   return (
@@ -123,28 +130,34 @@ export default function OnboardingPage() {
             <div className="text-black">
               Name:
               <input
-                id="name"
+                name="name"
                 className="bg-white"
                 type="text"
                 placeholder="Name"
+                value={form.name}
+                onChange={handleChange}
               />
             </div>
             <div className="text-black">
               Age:
               <input
-                id="age"
+                name="age"
                 className="bg-white"
                 type="number"
                 placeholder="Age"
+                value={form.age}
+                onChange={handleChange}
               />
             </div>
             <div className="text-black">
               Bio:
               <input
-                id="bio"
+                name="bio"
                 className="bg-white"
                 type="text"
                 placeholder="Bio"
+                value={form.bio}
+                onChange={handleChange}
               />
             </div>
           </div>
