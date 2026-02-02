@@ -12,7 +12,6 @@ const postRoutes = require("./src/routes/postRoute.js");
 const userRoutes = require("./src/routes/userRoute.js");
 const profileRoutes = require("./src/routes/profileRoute.js");
 const feedRoute = require("./src/routes/feedRoute.js");
-const auth = require("./src/middleware/auth.js");
 const authRoutes = require("./src/routes/authRoute.js");
 
 const app = express();

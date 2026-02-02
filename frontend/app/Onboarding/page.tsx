@@ -27,7 +27,7 @@ export default function OnboardingPage() {
       body: JSON.stringify(form),
     });
 
-    router.push("/Feed");
+    router.push("/");
   };
 
   return (

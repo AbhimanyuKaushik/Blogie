@@ -10,7 +10,7 @@ router.get("/", auth, async (req, res) => {
     let limit = parseInt(req.query.limit, 10) || 10;
     let skip = parseInt(req.query.skip, 10) || 0;
 
-    // Clamp values
+    
     if (limit < 1) limit = 1;
     if (limit > 100) limit = 100;
     if (skip < 0) skip = 0;
@@ -28,7 +28,7 @@ router.get("/", auth, async (req, res) => {
       return res.json({ posts: [], total: 0, hasMore: false });
     }
 
-    // If user has interests, restrict posts to those matching at least one interest (post tags)
+    // If user has interests, restrict posts to those matching at least one interest
     const interests = Array.isArray(currentUser.interests) ? currentUser.interests : [];
     const tagFilter = interests.length ? { tags: { $in: interests } } : {};
 

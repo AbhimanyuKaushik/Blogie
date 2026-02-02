@@ -42,17 +42,21 @@ export default function Home() {
   if (!user) {
     return <HomePage />;
   }
-  
-  const filteredPosts = posts.filter((post:Post)=>post.tags.some(tag=>user.interests?.includes(tag)));
+
+  const filteredPosts = posts.filter((post: Post) =>
+    post.tags.some((tag) => user.interests?.includes(tag)),
+  );
   return (
     <div className="flex min-h-screen justify-center font-sans">
       <section>
         {loading ? (
           <div className="text-center mt-24 text-gray-500">Loading...</div>
         ) : filteredPosts.length === 0 ? (
-          posts.length === 0 ? <EmptyFeed /> : posts.map((post: Post) => <PostCard key={post._id} post={post} />)
+          <EmptyFeed />
         ) : (
-          filteredPosts.map((post: Post) => <PostCard key={post._id} post={post} />)
+          filteredPosts.map((post: Post) => (
+            <PostCard key={post._id} post={post} />
+          ))
         )}
       </section>
     </div>
@@ -62,49 +66,20 @@ export default function Home() {
 function HomePage() {
   return (
     <div className="grid grid-cols-2 h-full text-black font-sans">
-      
       <div className="flex flex-col justify-center px-24 gap-12">
         <h1 className="text-[64px] leading-[1.1] font-medium">
           Blogs that <br />
           can be <br />
           interesting.
         </h1>
-
-        <div className="flex flex-col gap-3 max-w-md">
-          <div className="flex items-center justify-between text-xs tracking-widest">
-            <span>CONTENT DISTRIBUTION</span>
-            <button className="border px-3 py-1 text-[10px]">
-              READ MORE
-            </button>
-          </div>
-          <p className="text-sm text-gray-600">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-            sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-          </p>
-          <div className="h-px bg-black/30 mt-2" />
-        </div>
-
-        <div className="flex flex-col gap-3 max-w-md">
-          <div className="flex items-center justify-between text-xs tracking-widest">
-            <span>DIGITAL ERA</span>
-            <button className="border px-3 py-1 text-[10px]">
-              READ MORE
-            </button>
-          </div>
-          <p className="text-sm text-gray-600">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-            sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-          </p>
-        </div>
       </div>
 
       <div className="relative flex items-center justify-center">
-
         <div className="relative w-105 h-130 bg-gray-300 overflow-hidden">
           <Image
             width={400}
             height={400}
-            src="/hand.webp" 
+            src="/hand.webp"
             alt="Abstract hand"
             className="w-full h-full object-cover grayscale"
           />
@@ -113,7 +88,6 @@ function HomePage() {
     </div>
   );
 }
-
 
 function EmptyFeed() {
   return (

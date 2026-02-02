@@ -124,12 +124,6 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         >
           {currState === "Sign Up" ? "Create account" : "Login"}
         </button>
-
-        <div className="flex items-start gap-2 text-sm">
-          <input type="checkbox" required />
-          <p>By continuing, I agree to the terms of use & privacy policy.</p>
-        </div>
-
         {currState === "Login" ? (
           <p className="text-sm">
             Create a new account?{" "}

@@ -20,7 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {user ? (
           <div
             style={{ width: isSidebarOpen ? SIDEBAR_WIDTH : 0 }}
-            className="fixed left-0 top-16 h-[calc(100vh-64px)]
+            className="fixed left-0 top-14 h-[calc(100vh-64px)]
                      transition-[width] duration-500
                      ease-[cubic-bezier(0.2,0,0,1)]
                      overflow-hidden border-r bg-white z-40"
