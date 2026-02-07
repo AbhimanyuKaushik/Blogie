@@ -8,10 +8,14 @@ const CommentLike = require("../models/CommentLike.js");
 // --------------------- CREATE POST ---------------------
 exports.createPost = async (req, res) => {
   try {
-    const { title, content, tags } = req.body;
+    const { title, document, tags } = req.body;
+
+    if (!title || !document)
+      return res.status(400).json({ message: "Missing fields" });
+
     const newPost = new Post({
       title,
-      content,
+      document,
       author: req.session.user._id,
       tags: tags || [],
     });
@@ -19,7 +23,13 @@ exports.createPost = async (req, res) => {
     await newPost.save();
     await newPost.populate("author", "username profileImage");
 
-    res.status(201).json({ message: "Post created successfully", post: newPost });
+    res.status(201).json({
+      message: "Post created successfully",
+      post: newPost,
+    });
+
+    console.log("SESSION USER:", req.session.user);
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -42,7 +52,7 @@ exports.getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId).populate(
       "author",
-      "username profileImage"
+      "username profileImage",
     );
 
     if (!post) return res.status(404).json({ message: "Post not found" });
@@ -51,7 +61,9 @@ exports.getPostById = async (req, res) => {
 
     res.status(200).json(post);
   } catch (error) {
-    res.status(500).json({ message: "Error fetching post", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching post", error: error.message });
   }
 };
 
@@ -59,7 +71,7 @@ exports.getPostById = async (req, res) => {
 exports.updatePost = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { title, content, tags } = req.body;
+    const { title, document, tags } = req.body;
 
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
@@ -68,21 +80,20 @@ exports.updatePost = async (req, res) => {
 
     const isOwner = post.author.toString() === userId;
     const isEditor = post.collaborators.some(
-      (c) => c.user.toString() === userId && c.role === "editor"
+      (c) => c.user.toString() === userId && c.role === "editor",
     );
 
     if (!isOwner && !isEditor) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    // Versioning
     post.versions.push({
-      content: post.content,
+      content: post.document,
       editedBy: userId,
     });
 
     if (title) post.title = title;
-    if (content) post.content = content;
+    if (document) post.document = document;
     if (tags) post.tags = tags;
 
     await post.save();
@@ -105,7 +116,9 @@ exports.deletePost = async (req, res) => {
     await Post.findByIdAndDelete(req.params.postId);
     res.json({ message: "Post deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting post", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error deleting post", error: error.message });
   }
 };
 
@@ -123,12 +136,16 @@ exports.likePost = async (req, res) => {
     const post = await Post.findByIdAndUpdate(
       postId,
       { $inc: { likesCount: 1 } },
-      { new: true }
+      { new: true },
     ).select("likesCount");
 
-    res.status(200).json({ message: "Post liked", likesCount: post.likesCount });
+    res
+      .status(200)
+      .json({ message: "Post liked", likesCount: post.likesCount });
   } catch (error) {
-    res.status(500).json({ message: "Error liking post", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error liking post", error: error.message });
   }
 };
 
@@ -144,7 +161,7 @@ exports.unlikePost = async (req, res) => {
     const post = await Post.findByIdAndUpdate(
       postId,
       { $inc: { likesCount: -1 } },
-      { new: true }
+      { new: true },
     ).select("likesCount");
 
     if (post.likesCount < 0) {
@@ -154,7 +171,9 @@ exports.unlikePost = async (req, res) => {
 
     res.json({ message: "Post unliked", likesCount: post.likesCount });
   } catch (error) {
-    res.status(500).json({ message: "Error unliking post", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error unliking post", error: error.message });
   }
 };
 
@@ -220,7 +239,9 @@ exports.addComment = async (req, res) => {
 
     res.status(201).json({ message: "Comment added", comment: newComment });
   } catch (error) {
-    res.status(500).json({ message: "Error adding comment", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error adding comment", error: error.message });
   }
 };
 
@@ -298,7 +319,10 @@ exports.likeComment = async (req, res) => {
     const { commentId } = req.params;
     const userId = req.session.user._id;
 
-    const existing = await CommentLike.findOne({ user: userId, comment: commentId });
+    const existing = await CommentLike.findOne({
+      user: userId,
+      comment: commentId,
+    });
     if (existing) return res.status(400).json({ message: "Already liked" });
 
     await new CommentLike({ user: userId, comment: commentId }).save();
@@ -306,7 +330,7 @@ exports.likeComment = async (req, res) => {
     const updated = await Comment.findByIdAndUpdate(
       commentId,
       { $inc: { likesCount: 1 } },
-      { new: true }
+      { new: true },
     ).select("likesCount");
 
     res.json({ message: "Comment liked", likesCount: updated.likesCount });
@@ -331,7 +355,7 @@ exports.unlikeComment = async (req, res) => {
     const updated = await Comment.findByIdAndUpdate(
       commentId,
       { $inc: { likesCount: -1 } },
-      { new: true }
+      { new: true },
     ).select("likesCount");
 
     res.json({ message: "Comment unliked", likesCount: updated.likesCount });
@@ -366,7 +390,7 @@ exports.unsavePost = async (req, res) => {
     const before = user.savedPosts.length;
 
     user.savedPosts = user.savedPosts.filter(
-      (p) => p.toString() !== postId.toString()
+      (p) => p.toString() !== postId.toString(),
     );
 
     if (user.savedPosts.length === before)
@@ -389,7 +413,7 @@ exports.searchPosts = async (req, res) => {
     if (q) {
       query.$or = [
         { title: { $regex: q, $options: "i" } },
-        { content: { $regex: q, $options: "i" } },
+        { tags: { $regex: q, $options: "i" } },
       ];
     }
     if (tag) query.tags = tag;
@@ -423,7 +447,7 @@ exports.addCollaborator = async (req, res) => {
     }
 
     const already = post.collaborators.some(
-      (c) => c.user.toString() === collaboratorId
+      (c) => c.user.toString() === collaboratorId,
     );
 
     if (already)
@@ -454,7 +478,7 @@ exports.removeCollaborator = async (req, res) => {
     const before = post.collaborators.length;
 
     post.collaborators = post.collaborators.filter(
-      (c) => c.user.toString() !== collaboratorId.toString()
+      (c) => c.user.toString() !== collaboratorId.toString(),
     );
 
     if (post.collaborators.length === before)
@@ -481,15 +505,13 @@ exports.updateCollaboratorRole = async (req, res) => {
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     if (post.author.toString() !== req.session.user._id.toString())
-
       return res.status(403).json({ message: "Not authorized" });
 
     const collab = post.collaborators.find(
-      (c) => c.user.toString() === collaboratorId
+      (c) => c.user.toString() === collaboratorId,
     );
 
-    if (!collab)
-      return res.status(400).json({ message: "Not a collaborator" });
+    if (!collab) return res.status(400).json({ message: "Not a collaborator" });
 
     collab.role = role;
     await post.save();
@@ -539,7 +561,7 @@ exports.unpublishPost = async (req, res) => {
 exports.autoSave = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { content } = req.body;
+    const { document } = req.body;
 
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
@@ -548,13 +570,13 @@ exports.autoSave = async (req, res) => {
 
     const isOwner = post.author.toString() === userId;
     const isEditor = post.collaborators.some(
-      (c) => c.user.toString() === userId && c.role === "editor"
+      (c) => c.user.toString() === userId && c.role === "editor",
     );
 
     if (!isOwner && !isEditor)
       return res.status(403).json({ message: "Not authorized" });
 
-    post.content = content;
+    post.document = document;
     post.lastAutoSavedAt = new Date();
 
     await post.save();

@@ -1,15 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import PostCard from "./Components/PostCard";
 import type { Post } from "./Types/PostTypes";
 import { useAuth } from "./Context/AuthContext";
 import Image from "next/image";
 
+const LIMIT = 10;
+
 export default function Home() {
   const { user } = useAuth();
+
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [skip, setSkip] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  const fetchFeed = useCallback(async (reset = false) => {
+    try {
+      setLoading(true);
+
+      const res = await fetch(
+        `http://localhost:5000/api/feed?limit=${LIMIT}&skip=${reset ? 0 : skip}`,
+        { credentials: "include" }
+      );
+
+      if (!res.ok) throw new Error("Failed to fetch feed");
+
+      const data = await res.json();
+
+      setPosts(prev =>
+        reset ? data.posts : [...prev, ...data.posts]
+      );
+
+      setHasMore(data.hasMore);
+      setSkip(prev => reset ? LIMIT : prev + LIMIT);
+    } catch (err) {
+      console.error("Feed error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [skip]);
 
   useEffect(() => {
     if (!user) {
@@ -17,47 +48,43 @@ export default function Home() {
       return;
     }
 
-    const getFeed = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/posts", {
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch posts");
-        }
-
-        const data = await res.json();
-        setPosts(data);
-      } catch (error) {
-        console.error("Error fetching posts:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getFeed();
-  }, [user]);
+    fetchFeed(true);
+  }, [fetchFeed, user]);
 
   if (!user) {
     return <HomePage />;
   }
-  
-  const filteredPosts = posts.filter((post:Post)=>post.tags.some(tag=>user.interests?.includes(tag)));
+
   return (
     <div className="flex min-h-screen justify-center font-sans">
-      <section>
-        {loading ? (
+      <section className="w-full max-w-2xl px-4">
+        {loading && posts.length === 0 ? (
           <div className="text-center mt-24 text-gray-500">Loading...</div>
-        ) : filteredPosts.length === 0 ? (
-           <EmptyFeed />
+        ) : posts.length === 0 ? (
+          <EmptyFeed />
         ) : (
-          filteredPosts.map((post: Post) => <PostCard key={post._id} post={post} />)
+          <>
+            {posts.map(post => (
+              <PostCard key={post._id} post={post} />
+            ))}
+
+            {hasMore && (
+              <div className="flex justify-center my-8">
+                <button
+                  onClick={() => fetchFeed()}
+                  className="border px-4 py-2 text-sm hover:bg-gray-100"
+                >
+                  Load more
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>
   );
 }
+
 
 function HomePage() {
   return (
