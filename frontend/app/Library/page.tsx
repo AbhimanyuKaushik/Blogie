@@ -1,9 +1,26 @@
-import React from "react";
+import { cookies } from "next/headers";
+import { Post } from "../Types/PostTypes";
+import LibraryClient from "../Components/LibraryClient";
+async function getSavedPosts(): Promise<Post[]> {
+  const cookieStore = await cookies();
 
-function page() {
-  return <div className="border-2 text-black">
-    <h1 className=" text-6xl font-sans">Your Library</h1>
-  </div>;
+  const cookieHeader = cookieStore
+    .getAll()
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
+
+  const res = await fetch("http://localhost:5000/api/posts/saved", {
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+
+  if (!res.ok) return [];
+
+  return res.json();
 }
 
-export default page;
+export default async function LibraryPage() {
+  const posts = await getSavedPosts();
+
+  return <LibraryClient initialPosts={posts} />;
+}

@@ -10,6 +10,8 @@ export type Post = {
     username: string;
     profileImage?: string;
   };
+  isLiked?: boolean;
+  isSaved?: boolean;
 };
 
 export type DocumentAST = {

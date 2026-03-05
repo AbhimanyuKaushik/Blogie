@@ -84,6 +84,10 @@ const postSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  isLiked: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 postSchema.pre("save", function (next) {
