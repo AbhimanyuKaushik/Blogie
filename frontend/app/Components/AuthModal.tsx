@@ -61,7 +61,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
       } else {
         router.push("/Onboarding");
       }
-    } catch (err) {
+    } catch {
       setError("Server error. Please try again.");
     }
   };

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BlockType, DocumentAST, ImageAttrs } from "../Types/PostTypes";
 import TextBlock from "../Components/StateBlocks/TextBlock";
 
-function getVideoEmbedUrl(url: string): string {
+export function getVideoEmbedUrl(url: string): string {
   const trimmed = url.trim();
 
   const ytMatch = trimmed.match(
