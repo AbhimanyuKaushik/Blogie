@@ -13,7 +13,7 @@ const collaboratorSchema = new mongoose.Schema(
       default: "editor",
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const versionSchema = new mongoose.Schema(
@@ -22,7 +22,7 @@ const versionSchema = new mongoose.Schema(
     editedAt: { type: Date, default: Date.now },
     editedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const postSchema = new mongoose.Schema({
@@ -31,9 +31,9 @@ const postSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  content: {
-    type: String,
-    required: true,
+  document: {
+    schemaVersion: { type: Number, required: true },
+    blocks: { type: Array, required: true },
   },
   author: {
     type: mongoose.Schema.Types.ObjectId,
@@ -48,10 +48,13 @@ const postSchema = new mongoose.Schema({
     type: [collaboratorSchema],
     default: [],
   },
-  versions: {
-    type: [versionSchema],
-    default: [],
-  },
+  versions: [
+    {
+      document: Object,
+      editedAt: { type: Date, default: Date.now },
+      editedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    },
+  ],
   status: {
     type: String,
     enum: ["draft", "published"],
@@ -80,6 +83,10 @@ const postSchema = new mongoose.Schema({
   lastAutoSavedAt: {
     type: Date,
     default: null,
+  },
+  isLiked: {
+    type: Boolean,
+    default: false,
   },
 });
 

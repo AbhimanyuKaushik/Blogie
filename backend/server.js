@@ -14,7 +14,7 @@ const profileRoutes = require("./src/routes/profileRoute.js");
 const feedRoute = require("./src/routes/feedRoute.js");
 const auth = require("./src/middleware/auth.js");
 const authRoutes = require("./src/routes/authRoute.js");
-
+const statsRoute = require("./src/routes/statsRoute.js");
 const app = express();
 const server = createServer(app);
 
@@ -22,7 +22,7 @@ app.use(
   cors({
     origin: "http://localhost:3000",
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
@@ -40,7 +40,7 @@ app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/feed", feedRoute);
-
+app.use("/api/stats", statsRoute);
 
 const io = new Server(server, {
   cors: {
@@ -57,7 +57,7 @@ collaboration.use((socket, next) => {
 
 collaboration.on("connection", (socket) => {
   const session = socket.request.session;
-  
+
   if (!session || !session.user) {
     console.log("Unauthorized socket connection");
     socket.disconnect(true);

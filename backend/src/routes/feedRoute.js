@@ -1,6 +1,7 @@
 const express = require("express");
 const Post = require("../models/Post");
 const User = require("../models/User");
+const Like = require("../models/Like");
 const auth = require("../middleware/auth");
 const router = express.Router();
 
@@ -10,35 +11,38 @@ router.get("/", auth, async (req, res) => {
     let limit = parseInt(req.query.limit, 10) || 10;
     let skip = parseInt(req.query.skip, 10) || 0;
 
-    // Clamp values
     if (limit < 1) limit = 1;
     if (limit > 100) limit = 100;
     if (skip < 0) skip = 0;
 
-    // Get current user's following list + interests
-    const currentUser = await User.findById(userId).select("following interests");
-    if (!currentUser) return res.status(404).json({ message: "User not found" });
+    const currentUser = await User.findById(userId).select(
+      "following interests savedPosts",
+    );
+    if (!currentUser)
+      return res.status(404).json({ message: "User not found" });
 
-    const following = Array.isArray(currentUser.following) ? currentUser.following : [];
+    const following = Array.isArray(currentUser.following)
+      ? currentUser.following
+      : [];
+    const interests = Array.isArray(currentUser.interests)
+      ? currentUser.interests
+      : [];
+    const savedSet = new Set(
+      currentUser.savedPosts?.map((p) => p.toString()) || [],
+    );
 
-    // Exclude current user: we only want other users' posts
-    const feedAuthorIds = following.filter(id => id.toString() !== userId.toString());
-
-    if (feedAuthorIds.length === 0) {
-      return res.json({ posts: [], total: 0, hasMore: false });
-    }
-
-    // If user has interests, restrict posts to those matching at least one interest (post tags)
-    const interests = Array.isArray(currentUser.interests) ? currentUser.interests : [];
+    const feedAuthorIds = following.filter(
+      (id) => id.toString() !== userId.toString(),
+    );
     const tagFilter = interests.length ? { tags: { $in: interests } } : {};
 
-    const query = {
-      author: { $in: feedAuthorIds },
-      ...tagFilter,
-    };
+    let query =
+      feedAuthorIds.length > 0
+        ? { author: { $in: feedAuthorIds }, ...tagFilter }
+        : { ...tagFilter, author: { $ne: userId } };
 
-    // Run queries in parallel
-    const [posts, total] = await Promise.all([
+    // Fetch posts + count in parallel
+    const [rawPosts, total] = await Promise.all([
       Post.find(query)
         .populate("author", "username profileImage")
         .sort({ createdAt: -1 })
@@ -47,17 +51,52 @@ router.get("/", auth, async (req, res) => {
       Post.countDocuments(query),
     ]);
 
+    // Compute isLiked for current user (very efficient)
+    let posts = rawPosts;
+    if (rawPosts.length > 0) {
+      const postIds = rawPosts.map((p) => p._id);
+
+      const userLikes = await Like.find({
+        user: userId,
+        post: { $in: postIds },
+      })
+        .select("post")
+        .lean();
+
+      const likedPostIds = new Set(
+        userLikes.map((like) => like.post.toString()),
+      );
+      // Get saved posts for current user
+      const savedPosts = await User.findById(userId)
+        .select("savedPosts")
+        .lean();
+
+      const savedSet = new Set(
+        savedPosts?.savedPosts.map((p) => p.toString()) || [],
+      );
+
+      // Override isLiked on each post
+      posts = rawPosts.map((post) => {
+        const postObj = post.toObject();
+        postObj.isLiked = likedPostIds.has(post._id.toString());
+        postObj.isSaved = savedSet.has(post._id.toString());
+        return postObj;
+      });
+    }
+
+    // Optional: temporary debug log (remove later)
+    // console.log("First post isLiked:", posts[0]?.isLiked);
+
     res.json({
       posts,
       total,
-      hasMore: skip + posts.length < total,
+      hasMore: skip + rawPosts.length < total,
     });
   } catch (error) {
-    if (process.env.NODE_ENV !== "production") {
-      console.error("Feed Error:", error);
-    } else {
-      console.error("Feed Error:", error.message);
-    }
+    console.error(
+      "Feed Error:",
+      process.env.NODE_ENV === "production" ? error.message : error,
+    );
     res.status(500).json({ error: error.message });
   }
 });

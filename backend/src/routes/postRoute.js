@@ -6,9 +6,13 @@ const router = express.Router();
 
 // CRUD Operations for Posts
 
-router.post("/",auth, postController.createPost);
-router.get("/", postController.getAllPosts);
+router.post("/", auth, postController.createPost);
+router.get("/", auth, postController.getAllPosts);
 router.get("/search", postController.searchPosts);
+
+// Get all saved posts for a user
+router.get("/saved", auth, postController.getSavedPosts);
+
 router.get("/:postId", auth, postController.getPostById);
 router.put("/:postId", auth, postController.updatePost);
 router.delete("/:postId", auth, postController.deletePost);
@@ -31,12 +35,24 @@ router.get("/:postId/likes", auth, postController.getPeopleWhoLikedPost);
 router.post("/:postId/comment", auth, postController.addComment);
 router.get("/:postId/comments", postController.getCommentsForPost);
 
-router.delete("/:postId/comments/:commentId", auth, postController.deleteComment);
+router.delete(
+  "/:postId/comments/:commentId",
+  auth,
+  postController.deleteComment,
+);
 router.put("/:postId/comments/:commentId", auth, postController.editComment);
 
 // Like / Unlike Comments
-router.post("/:postId/comments/:commentId/like", auth, postController.likeComment);
-router.delete("/:postId/comments/:commentId/like", auth, postController.unlikeComment);
+router.post(
+  "/:postId/comments/:commentId/like",
+  auth,
+  postController.likeComment,
+);
+router.delete(
+  "/:postId/comments/:commentId/like",
+  auth,
+  postController.unlikeComment,
+);
 
 // Save / Unsave Posts
 
@@ -47,10 +63,17 @@ router.delete("/:postId/save", auth, postController.unsavePost);
 router.post("/:postId/collaborators", auth, postController.addCollaborator);
 
 // Remove collaborator
-router.delete("/:postId/collaborators", auth, postController.removeCollaborator);
+router.delete(
+  "/:postId/collaborators",
+  auth,
+  postController.removeCollaborator,
+);
 
 // Update collaborator role (editor/commenter)
-router.patch("/:postId/collaborators/role", auth, postController.updateCollaboratorRole);
-
+router.patch(
+  "/:postId/collaborators/role",
+  auth,
+  postController.updateCollaboratorRole,
+);
 
 module.exports = router;
