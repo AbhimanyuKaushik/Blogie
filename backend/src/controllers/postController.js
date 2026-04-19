@@ -4,6 +4,8 @@ const User = require("../models/User.js");
 const Like = require("../models/Like.js");
 const Comment = require("../models/Comment.js");
 const CommentLike = require("../models/CommentLike.js");
+const Invite = require("../models/Invite");
+const Notification = require("../models/Notification");
 
 // --------------------- CREATE POST ---------------------
 exports.createPost = async (req, res) => {
@@ -523,28 +525,37 @@ exports.searchPosts = async (req, res) => {
 exports.addCollaborator = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { collaboratorId } = req.body;
+    const { username, role } = req.body;
 
     const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: "Post not found" });
+    const user = await User.findOne({ username });
 
-    if (post.author.toString() !== req.session.user._id.toString()) {
-      return res.status(403).json({ message: "Not authorized" });
+    if (!post || !user) {
+      return res.status(404).json({ message: "Post or user not found" });
     }
 
-    const already = post.collaborators.some(
-      (c) => c.user.toString() === collaboratorId,
-    );
+    const invite = await Invite.create({
+      post: postId,
+      sender: req.session.user._id,
+      receiver: user._id,
+      role,
+    });
 
-    if (already)
-      return res.status(400).json({ message: "Already a collaborator" });
+    await Notification.create({
+      receiver: user._id,
+      sender: req.session.user._id,
+      type: "invite",
+      post: post._id,
+      message: `${req.session.user.username} invited you to collaborate on "${post.title}"`,
+    });
 
-    post.collaborators.push({ user: collaboratorId, role: "editor" });
-    await post.save();
-
-    res.json({ message: "Collaborator added", post });
+    res.json({
+      message: "Invitation sent",
+      invite,
+    });
   } catch (error) {
-    res.status(500).json({ error });
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -552,7 +563,7 @@ exports.addCollaborator = async (req, res) => {
 exports.removeCollaborator = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { collaboratorId } = req.body;
+    const { username } = req.body;
 
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
@@ -563,14 +574,20 @@ exports.removeCollaborator = async (req, res) => {
 
     const before = post.collaborators.length;
 
+    const user = await User.findOne({ username });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
     post.collaborators = post.collaborators.filter(
-      (c) => c.user.toString() !== collaboratorId.toString(),
+      (c) => c.user.toString() !== user._id.toString(),
     );
 
     if (post.collaborators.length === before)
       return res.status(400).json({ message: "User is not a collaborator" });
 
     await post.save();
+
+    await post.populate("collaborators.user", "username");
     res.json({ message: "Collaborator removed", post });
   } catch (error) {
     res.status(500).json({ error });
@@ -581,7 +598,7 @@ exports.removeCollaborator = async (req, res) => {
 exports.updateCollaboratorRole = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { collaboratorId, role } = req.body;
+    const { username, role } = req.body;
 
     const validRoles = ["editor", "commenter"];
     if (!validRoles.includes(role))
@@ -593,14 +610,19 @@ exports.updateCollaboratorRole = async (req, res) => {
     if (post.author.toString() !== req.session.user._id.toString())
       return res.status(403).json({ message: "Not authorized" });
 
+    const user = await User.findOne({ username });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
     const collab = post.collaborators.find(
-      (c) => c.user.toString() === collaboratorId,
+      (c) => c.user.toString() === user._id.toString(),
     );
 
     if (!collab) return res.status(400).json({ message: "Not a collaborator" });
 
     collab.role = role;
     await post.save();
+    await post.populate("collaborators.user", "username");
 
     res.json({ message: "Collaborator role updated", post });
   } catch (error) {

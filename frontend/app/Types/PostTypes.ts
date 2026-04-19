@@ -1,3 +1,5 @@
+import { Collaborator } from "./CollaboratorsType";
+
 export type Post = {
   _id: string;
   title: string;
@@ -12,7 +14,11 @@ export type Post = {
   };
   isLiked?: boolean;
   isSaved?: boolean;
+  collaborators: Collaborator[];
+  collaborationEnabled: boolean;
+  status: "draft" | "published";
 };
+
 
 export type DocumentAST = {
   schemaVersion: number;
