@@ -51,29 +51,121 @@ exports.completeOnboarding = async (req, res) => {
   }
 };
 
-exports.loginUser = async (req, res) => {
+exports.loginUser = async (
+  req,
+  res,
+) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: "Invalid credentials" });
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+
+    const {
+      email,
+      password,
+    } = req.body;
+
+    const user =
+      await User.findOne({
+        email,
+      });
+
+    if (!user) {
+      return res.status(401).json({
+        message:
+          "Invalid credentials",
+      });
+    }
+
+    const isMatch =
+      await bcrypt.compare(
+        password,
+        user.password,
+      );
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message:
+          "Invalid credentials",
+      });
+    }
+
+    // -----------------------------------
+    // SAVE SESSION
+    // -----------------------------------
 
     req.session.user = {
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      profileImage: user.profileImage || null,
-      isOnboarded: user.isOnboarded,
+      _id:
+        user._id.toString(),
+
+      username:
+        user.username,
+
+      email:
+        user.email,
+
+      profileImage:
+        user.profileImage ||
+        null,
+
+      isOnboarded:
+        user.isOnboarded,
     };
 
-    res.json({
-      message: "Logged in successfully",
-      username: req.session.user.username,
+    // -----------------------------------
+    // SAVE SESSION BEFORE RESPONSE
+    // -----------------------------------
+
+    req.session.save(
+      (err) => {
+
+        if (err) {
+          console.error(
+            err,
+          );
+
+          return res
+            .status(500)
+            .json({
+              message:
+                "Session save failed",
+            });
+        }
+
+        // DEBUG
+        console.log(
+          "SESSION AFTER LOGIN:",
+          req.session.user,
+        );
+
+        return res.json({
+          _id:
+            req.session.user
+              ._id,
+
+          message:
+            "Logged in successfully",
+
+          username:
+            req.session.user
+              .username,
+
+          email:
+            req.session.user
+              .email,
+        });
+      },
+    );
+
+  } catch (
+    err
+  ) {
+
+    console.error(
+      err,
+    );
+
+    return res.status(500).json({
+      error:
+        err.message,
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 };
 

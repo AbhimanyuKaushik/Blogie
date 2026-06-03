@@ -1,99 +1,263 @@
 "use client";
-import Image from "next/image";
-import { useAuth } from "../Context/AuthContext";
-import { Bell, PenLine } from "lucide-react";
-import { useState } from "react";
-import AuthModal from "./AuthModal";
+
 import Link from "next/link";
 
+import {
+  Bell,
+  PenLine,
+} from "lucide-react";
+
+import {
+  useState,
+} from "react";
+
+import {
+  useAuth,
+} from "../Context/AuthContext";
+
+import {
+  useSocket,
+} from "../Context/SocketContext";
+
+import AuthModal from "./AuthModal";
+
 type NavbarProps = {
-  onMenuClick: () => void;
+  onMenuClick:
+    () => void;
 };
 
-function Navbar({ onMenuClick }: NavbarProps) {
-  const { user, loading, logout } = useAuth();
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
+function Navbar({
+  onMenuClick,
+}: NavbarProps) {
+
+  const {
+    user,
+    loading,
+    logout,
+  } = useAuth();
+
+  const {
+    notifications,
+  } =
+    useSocket();
+
+  const [
+    showAuthModal,
+    setShowAuthModal,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    showMenu,
+    setShowMenu,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    showNotifications,
+    setShowNotifications,
+  ] =
+    useState(
+      false,
+    );
+
+  const unreadCount =
+    notifications.filter(
+      (n) =>
+        !n.isRead,
+    ).length;
 
   if (loading) {
-    return <nav className="w-full h-14 border-b bg-white" />;
+    return (
+      <nav className="w-full h-14 border-b bg-white" />
+    );
   }
 
   return (
     <nav className="w-full h-14 px-6 text-black flex items-center justify-between border-b bg-white">
+
       <div className="flex items-center gap-4">
+
         {user ? (
           <button
-            onClick={onMenuClick}
+            onClick={
+              onMenuClick
+            }
             className="p-1 rounded hover:bg-gray-100"
-            aria-label="Toggle sidebar"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="w-5 h-5"
-            >
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
+            ☰
           </button>
         ) : null}
 
-        <span className="text-2xl font-serif font-bold tracking-tight">
+        <span className="text-2xl font-serif font-bold">
           Blogie
         </span>
+
       </div>
 
-      <div className="flex items-center gap-10">
-        {user ? (
-          <button className="flex items-center gap-1 text-sm text-gray-700 hover:text-black">
+      <div className="flex items-center gap-8">
+
+        {user && (
+          <Link
+            href="/NewPost"
+            className="flex items-center gap-1"
+          >
             <PenLine className="w-4 h-4" />
-            <Link href={"/NewPost"}>
-              <span className="hidden sm:block">Write</span>
-            </Link>
-          </button>
-        ) : null}
-        <Bell className="w-5 h-5 cursor-pointer text-gray-700 hover:text-black" />
+
+            <span>
+              Write
+            </span>
+          </Link>
+        )}
+
+        {/* BELL */}
+
+        {user && (
+          <div className="relative">
+
+            <button
+              onClick={() =>
+                setShowNotifications(
+                  !showNotifications,
+                )
+              }
+              className="relative"
+            >
+
+              <Bell className="w-5 h-5" />
+
+              {unreadCount >
+                0 && (
+                <span className="absolute -top-2 -right-2 text-xs bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                  {
+                    unreadCount
+                  }
+                </span>
+              )}
+
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 mt-3 w-80 bg-white border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+
+                <div className="p-3 border-b font-medium">
+                  Notifications
+                </div>
+
+                {notifications.length ===
+                0 ? (
+                  <div className="p-4 text-sm text-gray-500">
+                    No notifications
+                  </div>
+                ) : (
+                  notifications.map(
+                    (
+                      notification,
+                      i,
+                    ) => (
+                      <Link
+                        key={
+                          notification._id ||
+                          i
+                        }
+                        href={`/NewPost/${notification.post?._id} : #`}
+                        className="block p-3 border-b hover:bg-gray-50"
+                      >
+                        <p className="text-sm">
+                          {
+                            notification.message
+                          }
+                        </p>
+
+                        {notification.post && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {
+                              notification.post.title
+                            }
+                          </p>
+                        )}
+                      </Link>
+                    ),
+                  )
+                )}
+
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* USER */}
+
         {!user ? (
           <button
-            onClick={() => setShowAuthModal(true)}
+            onClick={() =>
+              setShowAuthModal(
+                true,
+              )
+            }
             className="bg-green-600 text-white px-4 h-8 rounded text-sm"
           >
-            Login / Signup
+            Login /
+            Signup
           </button>
         ) : (
           <div className="relative">
+
             <img
-              src={user.profileImage || "/default-avatar.png"}
-              alt="User avatar"
-              width={64}
-              height={64}
+              src={
+                user.profileImage ||
+                "/default-avatar.png"
+              }
+              alt="avatar"
+              width={36}
+              height={36}
               className="rounded-full cursor-pointer"
-              onClick={() => setShowMenu(!showMenu)}
+              onClick={() =>
+                setShowMenu(
+                  !showMenu,
+                )
+              }
             />
 
             {showMenu && (
               <div className="absolute right-0 mt-2 w-40 bg-white border rounded shadow-md">
+
                 <button
                   onClick={() => {
                     logout();
-                    setShowMenu(false);
+
+                    setShowMenu(
+                      false,
+                    );
                   }}
                   className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
                 >
                   Logout
                 </button>
+
               </div>
             )}
+
           </div>
         )}
 
-        {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+        {showAuthModal && (
+          <AuthModal
+            onClose={() =>
+              setShowAuthModal(
+                false,
+              )
+            }
+          />
+        )}
+
       </div>
+
     </nav>
   );
 }
