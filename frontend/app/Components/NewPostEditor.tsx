@@ -34,7 +34,6 @@ export function getVideoEmbedUrl(
   url: string,
 ): string {
   const trimmed = url.trim();
-
   const ytMatch = trimmed.match(
     /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
   );

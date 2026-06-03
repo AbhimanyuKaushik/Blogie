@@ -4,7 +4,12 @@ const User = require("../models/User.js");
 const Like = require("../models/Like.js");
 const Comment = require("../models/Comment.js");
 const CommentLike = require("../models/CommentLike.js");
+<<<<<<< HEAD
 const Notification = require("../models/Notification.js");
+=======
+const Invite = require("../models/Invite");
+const Notification = require("../models/Notification");
+>>>>>>> 7d0f1f8dd944450432ae88c085b4c1ef171b419b
 
 // --------------------- CREATE POST ---------------------
 exports.createPost = async (req, res) => {
@@ -1001,19 +1006,35 @@ exports.getCollaborativePost =
             "username email profileImage",
           );
 
+<<<<<<< HEAD
       if (!post) {
         return res.status(404).json({
           message:
             "Post not found",
         });
       }
+=======
+    const user = await User.findOne({ username });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const collab = post.collaborators.find(
+      (c) => c.user.toString() === user._id.toString(),
+    );
+>>>>>>> 7d0f1f8dd944450432ae88c085b4c1ef171b419b
 
       const userId =
         req.session.user._id.toString();
 
+<<<<<<< HEAD
       const isOwner =
         post.author._id.toString() ===
         userId;
+=======
+    collab.role = role;
+    await post.save();
+    await post.populate("collaborators.user", "username");
+>>>>>>> 7d0f1f8dd944450432ae88c085b4c1ef171b419b
 
       const isCollaborator =
         post.collaborators.some(

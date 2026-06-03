@@ -88,6 +88,10 @@ const postSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  collaborationEnabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 postSchema.pre("save", function (next) {
