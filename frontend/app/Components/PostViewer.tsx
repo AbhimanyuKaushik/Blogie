@@ -1,7 +1,23 @@
 "use client"; // Keep this—it's interactive (images, embeds)
 
 import { Post, BlockNode, ImageAttrs } from "../Types/PostTypes"; // Your types are here ✅
-import { getVideoEmbedUrl } from "./NewPostEditor"; // Reuse your helper! (it's in the same folder)
+
+export function getVideoEmbedUrl(url: string) {
+  if (!url) return "";
+  let embedUrl = url;
+  if (url.includes("youtube.com/watch?v=")) {
+    embedUrl = url.replace("watch?v=", "embed/");
+    const ampersandPosition = embedUrl.indexOf("&");
+    if (ampersandPosition !== -1) {
+      embedUrl = embedUrl.substring(0, ampersandPosition);
+    }
+  } else if (url.includes("youtu.be/")) {
+    embedUrl = url.replace("youtu.be/", "youtube.com/embed/");
+  } else if (url.includes("vimeo.com/")) {
+    embedUrl = url.replace("vimeo.com/", "player.vimeo.com/video/");
+  }
+  return embedUrl;
+}
 
 interface PostViewerProps {
   post: Post;

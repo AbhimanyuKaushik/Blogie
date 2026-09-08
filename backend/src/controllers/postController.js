@@ -1,11 +1,17 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 const Post = require("../models/Post.js");
 const User = require("../models/User.js");
 const Like = require("../models/Like.js");
 const Comment = require("../models/Comment.js");
 const CommentLike = require("../models/CommentLike.js");
-const Invite = require("../models/Invite");
-const Notification = require("../models/Notification");
+const Invite = require("../models/Invite.js");
+const Notification = require("../models/Notification.js");
+const {
+  canEditPost,
+  canManageCollaborators,
+  getUserRole,
+} = require("../utils/collaboration.js");
 
 // --------------------- CREATE POST ---------------------
 exports.createPost = async (req, res) => {
@@ -33,6 +39,59 @@ exports.createPost = async (req, res) => {
     console.log("SESSION USER:", req.session.user);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// --------------------- CREATE COLLABORATIVE DRAFT ---------------------
+exports.createDraft = async (req, res) => {
+  try {
+    const { title, document, tags } = req.body;
+    const userId = req.session.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    if (!document) {
+      return res.status(400).json({ message: "Document is required" });
+    }
+
+    if (
+      typeof document.schemaVersion !== "number" ||
+      !Array.isArray(document.blocks)
+    ) {
+      return res.status(400).json({
+        message:
+          "Invalid document format. schemaVersion and blocks are required.",
+      });
+    }
+
+    const draft = new Post({
+      title:
+        typeof title === "string" && title.trim()
+          ? title.trim()
+          : "Untitled draft",
+      document,
+      author: userId,
+      tags: Array.isArray(tags) ? tags : [],
+      status: "draft",
+      collaborationEnabled: true,
+      collaborators: [],
+    });
+
+    await draft.save();
+    await draft.populate("author", "username profileImage");
+
+    return res.status(201).json({
+      message: "Collaborative draft created",
+      post: draft,
+    });
+  } catch (error) {
+    console.error("CREATE DRAFT ERROR:", error);
+    return res.status(500).json({
+      message: "Failed to create collaborative draft",
+      error: error.message,
+    });
   }
 };
 
@@ -78,6 +137,7 @@ exports.getPostById = async (req, res) => {
       { new: true }, // return updated document
     )
       .populate("author", "username profileImage")
+      .populate("collaborators.user", "username profileImage")
       .lean();
 
     if (!post) return res.status(404).json({ message: "Post not found" });
@@ -96,6 +156,10 @@ exports.getPostById = async (req, res) => {
         user?.savedPosts
           .map((p) => p.toString())
           .includes(post._id.toString()) || false;
+
+      post.currentUserRole = getUserRole(post, userId);
+      post.canEdit = canEditPost(post, userId);
+      post.canManageCollaborators = canManageCollaborators(post, userId);
     }
 
     res.status(200).json(post);
@@ -113,34 +177,52 @@ exports.updatePost = async (req, res) => {
     const { postId } = req.params;
     const { title, document, tags } = req.body;
 
+    if (
+      !document ||
+      typeof document.schemaVersion !== "number" ||
+      !Array.isArray(document.blocks)
+    ) {
+      return res.status(400).json({
+        message:
+          "Invalid document format. schemaVersion and blocks are required.",
+      });
+    }
+
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     const userId = req.session.user._id.toString();
 
-    const isOwner = post.author.toString() === userId;
-    const isEditor = post.collaborators.some(
-      (c) => c.user.toString() === userId && c.role === "editor",
-    );
-
-    if (!isOwner && !isEditor) {
-      return res.status(403).json({ message: "Not authorized" });
+    if (!canEditPost(post, userId)) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to edit this post" });
     }
 
     post.versions.push({
-      content: post.document,
+      document: post.document,
       editedBy: userId,
     });
 
-    if (title) post.title = title;
-    if (document) post.document = document;
-    if (tags) post.tags = tags;
+    post.document = document;
+    if (typeof title === "string") {
+      post.title = title.trim() || "Untitled draft";
+    }
+    if (Array.isArray(tags)) {
+      post.tags = tags;
+    }
 
     await post.save();
+    await post.populate("author", "username profileImage");
+    await post.populate("collaborators.user", "username profileImage");
 
-    res.json({ message: "Post updated", post });
+    return res.json({ message: "Post updated", post });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("UPDATE POST ERROR:", error);
+    return res.status(500).json({
+      message: "Failed to update post",
+      error: error.message,
+    });
   }
 };
 
@@ -521,41 +603,200 @@ exports.searchPosts = async (req, res) => {
   }
 };
 
+// --------------------- ADD COLLABORATOR / SEND INVITE ---------------------
 // --------------------- ADD COLLABORATOR ---------------------
+
 exports.addCollaborator = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { username, role } = req.body;
 
-    const post = await Post.findById(postId);
-    const user = await User.findOne({ username });
+    const username =
+      typeof req.body.username === "string" ? req.body.username.trim() : "";
 
-    if (!post || !user) {
-      return res.status(404).json({ message: "Post or user not found" });
+    const role = req.body.role || "editor";
+
+    // --------------------------------------------------
+    // 1. Validate logged-in user
+    // --------------------------------------------------
+
+    const currentUser = req.session?.user;
+
+    if (!currentUser?._id) {
+      return res.status(401).json({
+        message: "Authentication required. Please log in.",
+      });
     }
 
+    const currentUserId = currentUser._id.toString();
+
+    // --------------------------------------------------
+    // 2. Validate request
+    // --------------------------------------------------
+
+    if (!username) {
+      return res.status(400).json({
+        message: "Username is required.",
+      });
+    }
+
+    if (!["editor", "commenter"].includes(role)) {
+      return res.status(400).json({
+        message: "Role must be either editor or commenter.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 3. Find post
+    // --------------------------------------------------
+
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({
+        message: "Post not found.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 4. Check permission
+    // Only the owner can invite collaborators
+    // --------------------------------------------------
+
+    if (!canManageCollaborators(post, currentUserId)) {
+      return res.status(403).json({
+        message: "You are not authorized to manage collaborators.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 5. Find the user being invited
+    // --------------------------------------------------
+
+    const collaboratorUser = await User.findOne({
+      username: {
+        $regex: new RegExp(`^${username}$`, "i"),
+      },
+    });
+
+    if (!collaboratorUser) {
+      return res.status(404).json({
+        message: `User "@${username}" was not found.`,
+      });
+    }
+
+    const collaboratorUserId = collaboratorUser._id.toString();
+
+    // --------------------------------------------------
+    // 6. Prevent inviting yourself
+    // --------------------------------------------------
+
+    if (collaboratorUserId === currentUserId) {
+      return res.status(400).json({
+        message: "You cannot invite yourself as a collaborator.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 7. Check existing collaborator
+    // --------------------------------------------------
+
+    const existingCollaborator = post.collaborators?.find(
+      (entry) => entry.user && entry.user.toString() === collaboratorUserId,
+    );
+
+    if (existingCollaborator) {
+      return res.status(400).json({
+        message: "This user is already a collaborator.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 8. Check for existing pending invite
+    // --------------------------------------------------
+
+    const existingInvite = await Invite.findOne({
+      post: post._id,
+      receiver: collaboratorUser._id,
+      status: "pending",
+    });
+
+    if (existingInvite) {
+      return res.status(400).json({
+        message: "An invitation has already been sent to this user.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 9. Create collaboration invite
+    // --------------------------------------------------
+
     const invite = await Invite.create({
-      post: postId,
-      sender: req.session.user._id,
-      receiver: user._id,
+      post: post._id,
+      sender: currentUser._id,
+      receiver: collaboratorUser._id,
+      role,
+      status: "pending",
+      token: crypto.randomUUID(),
+    });
+
+    // --------------------------------------------------
+    // 10. Create notification
+    //
+    // IMPORTANT:
+    // Your Notification schema uses:
+    //
+    // receiver
+    // sender
+    // type
+    // post
+    // message
+    // read
+    // --------------------------------------------------
+
+    const notification = await Notification.create({
+      receiver: collaboratorUser._id,
+      sender: currentUser._id,
+      type: "invite",
+      post: post._id,
+      message: `${currentUser.username || "Someone"} invited you to collaborate on "${post.title}".`,
+      read: false,
+    });
+
+    console.log("[COLLABORATION INVITE CREATED]", {
+      inviteId: invite._id.toString(),
+      notificationId: notification._id.toString(),
+      sender: currentUserId,
+      receiver: collaboratorUserId,
+      postId: post._id.toString(),
       role,
     });
 
-    await Notification.create({
-      receiver: user._id,
-      sender: req.session.user._id,
-      type: "invite",
-      post: post._id,
-      message: `${req.session.user.username} invited you to collaborate on "${post.title}"`,
-    });
+    // --------------------------------------------------
+    // 11. Populate response data
+    // --------------------------------------------------
 
-    res.json({
-      message: "Invitation sent",
+    await invite.populate("sender", "username profileImage");
+
+    await invite.populate("receiver", "username profileImage");
+
+    // --------------------------------------------------
+    // 12. Send response
+    // --------------------------------------------------
+
+    return res.status(201).json({
+      success: true,
+      message: `Invitation sent to @${collaboratorUser.username}.`,
       invite,
+      notification,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("[ADD COLLABORATOR ERROR]", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send collaboration invitation.",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 
@@ -568,7 +809,7 @@ exports.removeCollaborator = async (req, res) => {
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (post.author.toString() !== req.session.user._id.toString()) {
+    if (!canManageCollaborators(post, req.session.user._id.toString())) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
@@ -607,7 +848,7 @@ exports.updateCollaboratorRole = async (req, res) => {
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (post.author.toString() !== req.session.user._id.toString())
+    if (!canManageCollaborators(post, req.session.user._id.toString()))
       return res.status(403).json({ message: "Not authorized" });
 
     const user = await User.findOne({ username });
@@ -636,15 +877,27 @@ exports.publishPost = async (req, res) => {
     const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (post.author.toString() !== req.session.user._id.toString())
-      return res.status(403).json({ message: "Not authorized" });
+    const userId = req.session.user._id.toString();
+
+    if (post.author.toString() !== userId) {
+      return res
+        .status(403)
+        .json({ message: "Only the post owner can publish this post" });
+    }
 
     post.status = "published";
     await post.save();
 
-    res.json({ message: "Post published", post });
+    await post.populate("author", "username profileImage");
+    await post.populate("collaborators.user", "username profileImage");
+
+    return res.json({ message: "Post published", post });
   } catch (error) {
-    res.status(500).json({ error });
+    console.error("PUBLISH POST ERROR:", error);
+    return res.status(500).json({
+      message: "Failed to publish post",
+      error: error.message,
+    });
   }
 };
 
@@ -653,15 +906,27 @@ exports.unpublishPost = async (req, res) => {
     const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (post.author.toString() !== req.session.user._id.toString())
-      return res.status(403).json({ message: "Not authorized" });
+    const userId = req.session.user._id.toString();
+
+    if (post.author.toString() !== userId) {
+      return res
+        .status(403)
+        .json({ message: "Only the post owner can unpublish this post" });
+    }
 
     post.status = "draft";
     await post.save();
 
-    res.json({ message: "Post unpublished", post });
+    await post.populate("author", "username profileImage");
+    await post.populate("collaborators.user", "username profileImage");
+
+    return res.json({ message: "Post unpublished", post });
   } catch (error) {
-    res.status(500).json({ error });
+    console.error("UNPUBLISH POST ERROR:", error);
+    return res.status(500).json({
+      message: "Failed to unpublish post",
+      error: error.message,
+    });
   }
 };
 
@@ -671,26 +936,74 @@ exports.autoSave = async (req, res) => {
     const { postId } = req.params;
     const { document } = req.body;
 
+    if (
+      !document ||
+      typeof document.schemaVersion !== "number" ||
+      !Array.isArray(document.blocks)
+    ) {
+      return res.status(400).json({
+        message:
+          "Invalid document format. schemaVersion and blocks are required.",
+      });
+    }
+
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     const userId = req.session.user._id.toString();
 
-    const isOwner = post.author.toString() === userId;
-    const isEditor = post.collaborators.some(
-      (c) => c.user.toString() === userId && c.role === "editor",
-    );
-
-    if (!isOwner && !isEditor)
-      return res.status(403).json({ message: "Not authorized" });
+    if (!canEditPost(post, userId)) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to edit this post" });
+    }
 
     post.document = document;
     post.lastAutoSavedAt = new Date();
 
     await post.save();
 
-    res.json({ message: "Autosaved", post, lastSaved: post.lastAutoSavedAt });
+    return res.json({
+      message: "Autosaved",
+      post,
+      lastSaved: post.lastAutoSavedAt,
+    });
   } catch (error) {
-    res.status(500).json({ error });
+    console.error("AUTOSAVE ERROR:", error);
+    return res.status(500).json({
+      message: "Failed to autosave post",
+      error: error.message,
+    });
+  }
+};
+
+// --------------------- TOGGLE COLLABORATION ---------------------
+exports.toggleCollaboration = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { enabled } = req.body; // boolean
+
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const userId = req.session.user._id.toString();
+
+    // Only owner can toggle collaboration
+    if (!canManageCollaborators(post, userId)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    post.collaborationEnabled = Boolean(enabled);
+    await post.save();
+
+    await post.populate("author", "username profileImage");
+    await post.populate("collaborators.user", "username profileImage");
+
+    res.json({
+      message: `Collaboration ${post.collaborationEnabled ? "enabled" : "disabled"}`,
+      post,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };

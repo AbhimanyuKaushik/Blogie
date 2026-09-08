@@ -14,7 +14,8 @@ const notificationSchema = new mongoose.Schema({
 
   type: {
     type: String,
-    enum: ["invite", "comment", "mention"],
+    enum: ["invite", "collaboration_invite", "comment", "mention"],
+    required: true,
   },
 
   post: {
@@ -22,7 +23,10 @@ const notificationSchema = new mongoose.Schema({
     ref: "Post",
   },
 
-  message: String,
+  message: {
+    type: String,
+    default: "",
+  },
 
   read: {
     type: Boolean,
