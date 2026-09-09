@@ -14,8 +14,7 @@ const notificationSchema = new mongoose.Schema({
 
   type: {
     type: String,
-    enum: ["invite", "collaboration_invite", "comment", "mention"],
-    required: true,
+    enum: ["invite", "comment", "mention"],
   },
 
   post: {
@@ -23,9 +22,16 @@ const notificationSchema = new mongoose.Schema({
     ref: "Post",
   },
 
+  // IMPORTANT:
+  // Stores the exact invitation associated with this notification.
+  relatedInvite: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Invite",
+    default: null,
+  },
+
   message: {
     type: String,
-    default: "",
   },
 
   read: {

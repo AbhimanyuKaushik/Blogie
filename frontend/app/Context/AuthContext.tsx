@@ -9,6 +9,8 @@ import {
 } from "react";
 import { User } from "../Types/UserTypes";
 
+import { useRouter } from "next/navigation";
+
 type AuthContextType = {
   user: User | null;
   loading: boolean;
@@ -21,7 +23,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
+  const router = useRouter();
   // Check session on app load
 
   useEffect(() => {
@@ -57,6 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: "include",
       });
       setUser(null);
+      router.replace("/");
+      router.refresh();
     } catch (error) {
       console.error("Logout failed", error);
     }

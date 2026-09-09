@@ -1,7 +1,7 @@
 {
   "type": "commonjs",
   "dependencies": {
-    "@liveblocks/node": "^3.24.0",
+    "@liveblocks/node": "^3.24.1",
     "bcrypt": "^6.0.0",
     "cloudinary": "^1.41.3",
     "connect-mongo": "^6.0.0",

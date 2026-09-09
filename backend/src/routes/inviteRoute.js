@@ -1,12 +1,31 @@
 const express = require("express");
-const router = express.Router();
-const inviteController = require("../controllers/inviteController.js");
+const auth = require("../middleware/auth.js");
 
-router.get("/", inviteController.getInvites);
-router.get("/token/:token", inviteController.validateInviteToken);
-router.post("/accept-token", inviteController.acceptInviteByToken);
-router.post("/:postId", inviteController.createInvite);
-router.patch("/:inviteId/accept", inviteController.acceptInvite);
-router.patch("/:inviteId/reject", inviteController.rejectInvite);
+const {
+  acceptInvite,
+  acceptInviteByToken,
+  validateInviteToken,
+  rejectInvite,
+  getInvites,
+  createInvite,
+} = require("../controllers/inviteController.js");
+
+const router = express.Router();
+
+/* ============================================================
+   INVITATIONS
+============================================================ */
+
+router.get("/", auth, getInvites);
+
+router.post("/create/:postId", auth, createInvite);
+
+router.patch("/:inviteId/accept", auth, acceptInvite);
+
+router.patch("/:inviteId/reject", auth, rejectInvite);
+
+router.post("/accept-token", auth, acceptInviteByToken);
+
+router.get("/validate/:token", validateInviteToken);
 
 module.exports = router;

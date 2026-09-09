@@ -732,11 +732,11 @@ exports.addCollaborator = async (req, res) => {
 
     const invite = await Invite.create({
       post: post._id,
-      sender: currentUser._id,
+      sender: req.session.user._id,
       receiver: collaboratorUser._id,
-      role,
-      status: "pending",
+      role: role || "editor",
       token: crypto.randomUUID(),
+      status: "pending",
     });
 
     // --------------------------------------------------
@@ -758,6 +758,7 @@ exports.addCollaborator = async (req, res) => {
       sender: currentUser._id,
       type: "invite",
       post: post._id,
+      relatedInvite: invite._id,
       message: `${currentUser.username || "Someone"} invited you to collaborate on "${post.title}".`,
       read: false,
     });
