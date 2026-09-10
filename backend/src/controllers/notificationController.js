@@ -4,7 +4,16 @@ exports.getNotifications = async (req, res) => {
   try {
     const userId = req.session?.user?._id;
 
+    console.log("\n========================================");
+    console.log("       GET NOTIFICATIONS");
+    console.log("========================================");
+    console.log("Session ID:", req.sessionID);
+    console.log("Session user:", req.session?.user);
+    console.log("User ID:", userId);
+
     if (!userId) {
+      console.log("[NOTIFICATIONS] No authenticated user.");
+
       return res.status(401).json({
         message: "Not authenticated",
       });
@@ -16,8 +25,19 @@ exports.getNotifications = async (req, res) => {
       .populate("sender", "username profileImage")
       .populate("post", "title")
       .populate("relatedInvite", "role status sender receiver post")
-      .sort({ createdAt: -1 })
+      .sort({
+        createdAt: -1,
+      })
       .lean();
+
+    console.log("[NOTIFICATIONS] Found:", notifications.length);
+
+    console.log(
+      "[NOTIFICATIONS] Data:",
+      JSON.stringify(notifications, null, 2),
+    );
+
+    console.log("========================================\n");
 
     return res.status(200).json({
       success: true,

@@ -65,6 +65,12 @@ router.patch("/:postId/unpublish", auth, postController.unpublishPost);
 // Autosave post
 router.patch("/:postId/autosave", auth, postController.autoSave);
 
+// Update collaborative post title
+//
+// Owner and editor collaborators can update the title.
+// Commenters are not allowed to update the title.
+router.patch("/:postId/title", auth, postController.updatePostTitle);
+
 /*
 |--------------------------------------------------------------------------
 | COLLABORATION

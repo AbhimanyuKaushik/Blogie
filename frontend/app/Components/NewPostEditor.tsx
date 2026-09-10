@@ -1,16 +1,21 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { UserPlus } from "lucide-react";
 import {
   ClientSideSuspense,
   LiveblocksProvider,
   RoomProvider,
+  useOthers,
+  useUpdateMyPresence,
 } from "@liveblocks/react/suspense";
 
 import { useLiveblocksExtension } from "@liveblocks/react-tiptap";
 
 import { EditorContent, useEditor } from "@tiptap/react";
+import Document from "@tiptap/extension-document";
+import Paragraph from "@tiptap/extension-paragraph";
+import Text from "@tiptap/extension-text";
 
 import { BubbleMenu } from "@tiptap/react/menus";
 import CollaborateModal from "../Components/CollaborationModal";
@@ -76,6 +81,8 @@ const POST_API = {
 
   autosave: (postId: string) => `${API_BASE_URL}/posts/${postId}/autosave`,
 
+  updateTitle: (postId: string) => `${API_BASE_URL}/posts/${postId}/title`,
+
   publish: (postId: string) => `${API_BASE_URL}/posts/${postId}/publish`,
 };
 
@@ -109,6 +116,8 @@ type PostData = {
   currentUserRole?: "owner" | "editor" | "commenter";
 
   canManageCollaborators?: boolean;
+
+  status?: "draft" | "published";
 
   lastAutoSavedAt?: string;
 };
@@ -341,6 +350,179 @@ type TiptapCoreProps = NewPostEditorProps & {
   liveblocksExtension?: ReturnType<typeof useLiveblocksExtension>;
 };
 
+type CollaborationField = "title" | "document";
+
+type CollaborationFieldPresenceContextValue = {
+  focusField: (field: CollaborationField) => void;
+  blurField: (field: CollaborationField) => void;
+  hasRemoteFocus: (field: CollaborationField) => boolean;
+};
+
+const CollaborationFieldPresenceContext =
+  React.createContext<CollaborationFieldPresenceContextValue | null>(null);
+
+const CollaborationFieldPresenceProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const updateMyPresence = useUpdateMyPresence();
+  const others = useOthers();
+
+  const focusField = (field: CollaborationField) => {
+    updateMyPresence({ activeField: field });
+  };
+
+  const blurField = (field: CollaborationField) => {
+    requestAnimationFrame(() => {
+      const activeElement = document.activeElement;
+      const nextField =
+        activeElement instanceof HTMLElement
+          ? activeElement
+              .closest("[data-collab-field]")
+              ?.getAttribute("data-collab-field")
+          : null;
+
+      if (nextField !== field) {
+        updateMyPresence({ activeField: null });
+      }
+    });
+  };
+
+  const hasRemoteFocus = (field: CollaborationField) =>
+    others.some((other) => other.presence?.activeField === field);
+
+  return (
+    <CollaborationFieldPresenceContext.Provider
+      value={{ focusField, blurField, hasRemoteFocus }}
+    >
+      {children}
+    </CollaborationFieldPresenceContext.Provider>
+  );
+};
+
+const CollaborativeTitle = ({
+  initialTitle,
+  canEdit,
+  onChange,
+}: {
+  initialTitle: string;
+  canEdit: boolean;
+  onChange: (title: string) => void;
+}) => {
+  const { focusField, blurField, hasRemoteFocus } = React.useContext(
+    CollaborationFieldPresenceContext,
+  )!;
+
+  const liveblocksTitleExtension = useLiveblocksExtension({
+    collaborationMode: "liveblocks",
+    field: "title",
+    comments: false,
+    mentions: false,
+  });
+
+  const titleEditor = useEditor({
+    extensions: [
+      liveblocksTitleExtension,
+      Document,
+      Paragraph,
+      Text,
+      Placeholder.configure({ placeholder: "Post title" }),
+    ],
+    immediatelyRender: false,
+    editable: canEdit,
+    editorProps: {
+      attributes: {
+        class:
+          "outline-none min-h-[1.25em] text-4xl sm:text-5xl md:text-6xl font-black tracking-[-0.04em] leading-[1.05] text-gray-950",
+      },
+    },
+    onUpdate: ({ editor }) => {
+      onChange(editor.getText());
+    },
+  });
+
+  useEffect(() => {
+    if (!titleEditor) return;
+
+    const seedTitle = initialTitle.trim();
+
+    if (seedTitle && !titleEditor.getText().trim()) {
+      titleEditor.commands.setContent(
+        {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: seedTitle }],
+            },
+          ],
+        },
+        { emitUpdate: false },
+      );
+    }
+  }, [titleEditor, initialTitle]);
+
+  useEffect(() => {
+    if (!titleEditor) return;
+    titleEditor.setEditable(canEdit);
+  }, [titleEditor, canEdit]);
+
+  if (!titleEditor) {
+    return null;
+  }
+
+  return (
+    <div
+      data-collab-field="title"
+      className={`collaboration-title-editor rounded-2xl px-1 py-1 transition-colors ${
+        canEdit ? "cursor-text" : "cursor-default"
+      } ${
+        hasRemoteFocus("title")
+          ? "collaboration-field-remote-active"
+          : "collaboration-field-remote-inactive"
+      }`}
+      onFocusCapture={() => focusField("title")}
+      onBlurCapture={() => blurField("title")}
+      onClick={() => {
+        if (canEdit) {
+          titleEditor.commands.focus("end");
+        }
+      }}
+    >
+      <EditorContent editor={titleEditor} />
+    </div>
+  );
+};
+
+const CollaborativeTitleRoom = ({
+  initialTitle,
+  canEdit,
+  onChange,
+}: {
+  initialTitle: string;
+  canEdit: boolean;
+  onChange: (title: string) => void;
+}) => {
+  /*
+   * IMPORTANT:
+   * This component must NOT create another RoomProvider.
+   * Title and body intentionally share the same Liveblocks room,
+   * while useLiveblocksExtension uses different fields ("title"
+   * and "document"). This keeps presence/cursor awareness shared
+   * without mixing the two document states.
+   */
+  return (
+    <ClientSideSuspense fallback={null}>
+      <CollaborativeTitle
+        initialTitle={initialTitle}
+        canEdit={canEdit}
+        onChange={onChange}
+      />
+    </ClientSideSuspense>
+  );
+};
+
 const Tiptap = ({
   postId,
   initialTitle = "",
@@ -356,6 +538,14 @@ const Tiptap = ({
   onDraftCreated,
   liveblocksExtension,
 }: TiptapCoreProps) => {
+  const collaborationPresence = React.useContext(
+    CollaborationFieldPresenceContext,
+  );
+
+  const focusField = collaborationPresence?.focusField;
+  const blurField = collaborationPresence?.blurField;
+  const hasRemoteFocus = collaborationPresence?.hasRemoteFocus;
+
   /* ==========================================================
      STATE
   ========================================================== */
@@ -369,6 +559,12 @@ const Tiptap = ({
   const [tagInput, setTagInput] = useState("");
 
   const [saving, setSaving] = useState(false);
+
+  const [publishing, setPublishing] = useState(false);
+
+  const [postStatus, setPostStatus] = useState<"draft" | "published" | null>(
+    null,
+  );
 
   const [creatingDraft, setCreatingDraft] = useState(false);
 
@@ -397,6 +593,46 @@ const Tiptap = ({
 
   const effectivePostId = postId || draftPostId;
 
+  const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistCollaborativeTitle = (value: string) => {
+    const nextTitle = value.replace(/\s+/g, " ").trimStart();
+    setTitle(nextTitle);
+    onTitleChange?.(nextTitle);
+
+    if (!effectivePostId || !canEdit) return;
+
+    if (titleSaveTimer.current) {
+      clearTimeout(titleSaveTimer.current);
+    }
+
+    titleSaveTimer.current = setTimeout(async () => {
+      try {
+        const trimmedTitle = nextTitle.trim();
+        if (!trimmedTitle) return;
+
+        await apiRequest(POST_API.updateTitle(effectivePostId), {
+          method: "PATCH",
+          body: JSON.stringify({ title: trimmedTitle }),
+        });
+      } catch (error) {
+        const normalizedError =
+          error instanceof Error
+            ? error
+            : new Error("Failed to save the collaborative title.");
+        console.error("[COLLABORATIVE TITLE ERROR]", normalizedError);
+        setSaveError(normalizedError.message);
+        onError?.(normalizedError);
+      }
+    }, 700);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current);
+    };
+  }, []);
+
   /* ==========================================================
      MOUNT
   ========================================================== */
@@ -417,18 +653,18 @@ const Tiptap = ({
       // Core Tiptap extensions
       StarterKit.configure({
         undoRedo: liveblocksExtension ? false : undefined,
+        link: false,
+        underline: false,
 
         heading: {
           levels: [1, 2, 3],
         },
 
         bulletList: {
-          keepMarks: true,
           keepAttributes: false,
         },
 
         orderedList: {
-          keepMarks: true,
           keepAttributes: false,
         },
       }),
@@ -473,7 +709,7 @@ const Tiptap = ({
       }),
     ],
 
-    content: initialDocument,
+    content: liveblocksExtension ? undefined : initialDocument,
 
     immediatelyRender: false,
 
@@ -532,7 +768,7 @@ const Tiptap = ({
           throw new Error("Backend returned an empty post response.");
         }
 
-        if (post.document) {
+        if (post.document && !liveblocksExtension) {
           editor.commands.setContent(getTiptapDocument(post.document));
         }
 
@@ -542,6 +778,10 @@ const Tiptap = ({
 
         if (post.tags) {
           setTags(post.tags);
+        }
+
+        if (post.status) {
+          setPostStatus(post.status);
         }
 
         if (post.lastAutoSavedAt) {
@@ -566,7 +806,7 @@ const Tiptap = ({
     return () => {
       cancelled = true;
     };
-  }, [editor, effectivePostId, onError]);
+  }, [editor, effectivePostId, liveblocksExtension, onError]);
 
   /* ==========================================================
      SAVE DOCUMENT / AUTOSAVE
@@ -630,7 +870,7 @@ const Tiptap = ({
 
   useEffect(() => {
     if (!editor) return;
-    if (!postId) return;
+    if (!effectivePostId) return;
     if (!canEdit) return;
 
     const timeout = window.setTimeout(() => {
@@ -752,6 +992,7 @@ const Tiptap = ({
     console.log("[CREATE DRAFT SUCCESS]", savedDraft);
 
     setDraftPostId(draftId);
+    setPostStatus(savedDraft?.status || "draft");
 
     onDraftCreated?.(savedDraft);
 
@@ -793,7 +1034,7 @@ const Tiptap = ({
     });
 
     const result = await apiRequest<any>(POST_API.update(effectivePostId), {
-      method: "PATCH",
+      method: "PUT",
 
       body: JSON.stringify(payload),
     });
@@ -809,6 +1050,72 @@ const Tiptap = ({
     onSave?.(savedPost);
 
     return data;
+  };
+
+  /* ==========================================================
+     PUBLISH POST
+
+     Only the post owner can publish. Editors/commenters can
+     collaborate and save content, but they never receive the
+     Publish action.
+  ========================================================== */
+
+  const publishPost = async () => {
+    if (publishing || saving) return;
+
+    if (!effectivePostId) {
+      throw new Error("Post ID is missing.");
+    }
+
+    if (currentUserRole !== "owner") {
+      throw new Error("Only the post owner can publish this post.");
+    }
+
+    if (!title.trim()) {
+      throw new Error("Title is required.");
+    }
+
+    try {
+      setPublishing(true);
+      setSaveError(null);
+      setSaveStatus("saving");
+
+      /*
+       * Save the latest collaborative Tiptap content first.
+       * This makes sure edits made by the owner immediately before
+       * publishing are persisted before the status changes.
+       */
+      await updatePost();
+
+      const result = await apiRequest<any>(POST_API.publish(effectivePostId), {
+        method: "PATCH",
+      });
+
+      const data = result.data;
+      const publishedPost = data?.post || data?.data || data;
+
+      setPostStatus("published");
+      setSaveStatus("saved");
+      setSaveError(null);
+
+      onSave?.(publishedPost);
+
+      return data;
+    } catch (error) {
+      setSaveStatus("error");
+
+      const normalizedError =
+        error instanceof Error ? error : new Error("Failed to publish post.");
+
+      console.error("[PUBLISH POST ERROR]", normalizedError);
+
+      setSaveError(normalizedError.message);
+      onError?.(normalizedError);
+
+      throw normalizedError;
+    } finally {
+      setPublishing(false);
+    }
   };
 
   /* ==========================================================
@@ -1143,7 +1450,7 @@ const Tiptap = ({
   ========================================================== */
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* =====================================================
           POST HEADER
       ====================================================== */}
@@ -1151,25 +1458,25 @@ const Tiptap = ({
       <div className="mb-4">
         {/* TITLE */}
 
-        <div className="flex items-start gap-4">
-          <input
-            value={title}
-            onChange={handleTitleChange}
-            disabled={!canEdit}
-            placeholder="Post title"
-            className="
-        flex-1
-        w-full
-        text-4xl
-        md:text-5xl
-        font-bold
-        border-none
-        outline-none
-        placeholder:text-gray-300
-        disabled:cursor-not-allowed
-        disabled:bg-transparent
-      "
-          />
+        <div className="relative flex items-start gap-5">
+          <div className="flex-1 min-w-0">
+            {liveblocksExtension && effectivePostId ? (
+              <CollaborativeTitleRoom
+                postId={effectivePostId}
+                initialTitle={title}
+                canEdit={canEdit}
+                onChange={persistCollaborativeTitle}
+              />
+            ) : (
+              <input
+                value={title}
+                onChange={handleTitleChange}
+                disabled={!canEdit}
+                placeholder="Post title"
+                className="w-full bg-transparent border-0 outline-none text-4xl sm:text-5xl md:text-6xl font-black tracking-[-0.04em] leading-[1.05] text-gray-950 placeholder:text-gray-300"
+              />
+            )}
+          </div>
 
           {canEdit && (
             <button
@@ -1218,7 +1525,7 @@ const Tiptap = ({
                   setCreatingDraft(false);
                 }
               }}
-              className="
+              className={`
       shrink-0
       mt-2
       flex
@@ -1238,7 +1545,7 @@ const Tiptap = ({
       transition
       disabled:opacity-50
       disabled:cursor-not-allowed
-    "
+    `}
             >
               <UserPlus size={16} />
 
@@ -1256,7 +1563,7 @@ const Tiptap = ({
               type="button"
               disabled={!canEdit}
               onClick={() => removeTag(tag)}
-              className="
+              className={`
                 px-3
                 py-1
                 text-sm
@@ -1265,7 +1572,7 @@ const Tiptap = ({
                 rounded-full
                 hover:bg-gray-200
                 disabled:opacity-50
-              "
+              `}
               title="Remove tag"
             >
               #{tag} ×
@@ -1284,7 +1591,7 @@ const Tiptap = ({
                   }
                 }}
                 placeholder="Add tag"
-                className="
+                className={`
                   w-28
                   px-2
                   py-1
@@ -1294,13 +1601,13 @@ const Tiptap = ({
                   rounded-md
                   outline-none
                   focus:border-gray-400
-                "
+                `}
               />
 
               <button
                 type="button"
                 onClick={addTag}
-                className="
+                className={`
                   px-2
                   py-1
                   text-sm
@@ -1308,7 +1615,7 @@ const Tiptap = ({
                   border-gray-200
                   rounded-md
                   hover:bg-gray-50
-                "
+                `}
               >
                 Add
               </button>
@@ -1318,17 +1625,43 @@ const Tiptap = ({
 
         {/* ROLE */}
 
-        {currentUserRole && (
-          <div className="mt-3 text-xs text-gray-400">
-            Role: {currentUserRole}
-          </div>
-        )}
+        <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          {currentUserRole && (
+            <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 shadow-sm">
+              {currentUserRole === "owner"
+                ? "Owner"
+                : currentUserRole === "editor"
+                  ? "Editor"
+                  : "Commenter"}
+            </span>
+          )}
+          {liveblocksExtension && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Live collaboration
+            </span>
+          )}
+
+          {postStatus === "published" && (
+            <span className="inline-flex items-center rounded-full border border-green-100 bg-green-50 px-3 py-1.5 font-medium text-green-700">
+              Published
+            </span>
+          )}
+
+          {postStatus === "draft" &&
+            liveblocksExtension &&
+            currentUserRole !== "owner" && (
+              <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 font-medium text-gray-600">
+                Owner publishes
+              </span>
+            )}
+        </div>
 
         {/* LOAD ERROR */}
 
         {loadError && (
           <div
-            className="
+            className={`
               mt-3
               px-3
               py-2
@@ -1338,7 +1671,7 @@ const Tiptap = ({
               border-red-100
               text-red-600
               text-sm
-            "
+            `}
           >
             {loadError}
           </div>
@@ -1348,7 +1681,7 @@ const Tiptap = ({
 
         {saveError && (
           <div
-            className="
+            className={`
               mt-3
               px-3
               py-2
@@ -1359,7 +1692,7 @@ const Tiptap = ({
               text-red-700
               text-sm
               break-words
-            "
+            `}
           >
             <strong>Save failed:</strong> {saveError}
           </div>
@@ -1371,21 +1704,21 @@ const Tiptap = ({
       ====================================================== */}
 
       <div
-        className="
+        className={`
           bg-white
           border
-          border-gray-200
-          rounded-xl
-          shadow-sm
+          border-gray-200/80
+          rounded-2xl
+          shadow-[0_12px_40px_-20px_rgba(0,0,0,0.25)]
           overflow-hidden
-        "
+        `}
       >
         {/* ===================================================
             TOOLBAR
         ==================================================== */}
 
         <div
-          className="
+          className={`
             sticky
             top-0
             z-20
@@ -1395,11 +1728,12 @@ const Tiptap = ({
             flex-wrap
             px-3
             py-2
-            bg-white/95
-            backdrop-blur
+            bg-white/90
+            backdrop-blur-xl
             border-b
-            border-gray-200
-          "
+            border-gray-200/80
+            shadow-[0_1px_10px_rgba(0,0,0,.04)]
+          `}
         >
           {/* UNDO */}
 
@@ -1683,7 +2017,7 @@ const Tiptap = ({
             </ToolbarButton>
 
             <div
-              className="
+              className={`
                 absolute
                 top-10
                 left-0
@@ -1697,7 +2031,7 @@ const Tiptap = ({
                 p-2
                 gap-1
                 z-50
-              "
+              `}
             >
               {[
                 "#000000",
@@ -1714,13 +2048,13 @@ const Tiptap = ({
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => setTextColor(color)}
-                  className="
+                  className={`
                       w-6
                       h-6
                       rounded-full
                       border
                       border-gray-200
-                    "
+                    `}
                   style={{
                     backgroundColor: color,
                   }}
@@ -1731,7 +2065,7 @@ const Tiptap = ({
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={resetTextColor}
-                className="
+                className={`
                   w-6
                   h-6
                   rounded-full
@@ -1741,7 +2075,7 @@ const Tiptap = ({
                   items-center
                   justify-center
                   text-xs
-                "
+                `}
               >
                 ×
               </button>
@@ -1769,7 +2103,7 @@ const Tiptap = ({
           }}
         >
           <div
-            className="
+            className={`
               flex
               items-center
               gap-1
@@ -1779,7 +2113,7 @@ const Tiptap = ({
               shadow-xl
               px-2
               py-1
-            "
+            `}
           >
             <button
               type="button"
@@ -1833,11 +2167,25 @@ const Tiptap = ({
         ==================================================== */}
 
         <div
-          className="
+          data-collab-field="document"
+          onFocusCapture={() => {
+            if (liveblocksExtension) focusField?.("document");
+          }}
+          onBlurCapture={() => {
+            if (liveblocksExtension) blurField?.("document");
+          }}
+          className={`
             px-6
             sm:px-10
             md:px-14
             py-8
+            ${
+              liveblocksExtension && hasRemoteFocus?.("document")
+                ? "collaboration-field-remote-active"
+                : liveblocksExtension
+                  ? "collaboration-field-remote-inactive"
+                  : ""
+            }
             min-h-[500px]
             prose
             prose-lg
@@ -1907,7 +2255,7 @@ const Tiptap = ({
 
             [&_.ProseMirror_img]:rounded-lg
             [&_.ProseMirror_img]:max-w-full
-          "
+          `}
         >
           <EditorContent editor={editor} />
         </div>
@@ -1917,7 +2265,7 @@ const Tiptap = ({
         ==================================================== */}
 
         <div
-          className="
+          className={`
             flex
             flex-col
             sm:flex-row
@@ -1928,9 +2276,10 @@ const Tiptap = ({
             py-3
             border-t
             border-gray-100
+            bg-gray-50/70
             text-xs
-            text-gray-400
-          "
+            text-gray-500
+          `}
         >
           <div className="flex gap-4">
             <span>
@@ -1962,23 +2311,63 @@ const Tiptap = ({
             )}
 
             {canEdit && (
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="
-                  px-4
-                  py-2
-                  rounded-md
-                  bg-black
-                  text-white
-                  hover:bg-gray-800
-                  disabled:opacity-50
-                  disabled:cursor-not-allowed
-                "
-              >
-                {saving ? "Saving..." : effectivePostId ? "Save" : "Publish"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving || publishing}
+                  className={`
+                    px-4
+                    py-2
+                    rounded-md
+                    border
+                    border-gray-200
+                    bg-white
+                    text-gray-800
+                    hover:bg-gray-50
+                    disabled:opacity-50
+                    disabled:cursor-not-allowed
+                  `}
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+
+                {effectivePostId &&
+                  currentUserRole === "owner" &&
+                  postStatus === "draft" && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await publishPost();
+                        } catch {
+                          // publishPost already exposes the error in the UI.
+                        }
+                      }}
+                      disabled={saving || publishing}
+                      className={`
+                        px-4
+                        py-2
+                        rounded-md
+                        bg-black
+                        text-white
+                        hover:bg-gray-800
+                        disabled:opacity-50
+                        disabled:cursor-not-allowed
+                      `}
+                    >
+                      {publishing ? "Publishing..." : "Publish"}
+                    </button>
+                  )}
+
+                {effectivePostId &&
+                  currentUserRole === "owner" &&
+                  postStatus === "published" && (
+                    <span className="px-3 py-2 rounded-md bg-green-50 text-green-700 font-medium">
+                      Published
+                    </span>
+                  )}
+              </div>
             )}
           </div>
         </div>
@@ -1999,17 +2388,63 @@ const Tiptap = ({
       ====================================================== */}
 
       {!canEdit && (
-        <div
-          className="
-            mt-3
-            text-sm
-            text-gray-500
-            text-center
-          "
-        >
+        <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
           You have read-only access to this document.
         </div>
       )}
+
+      <style jsx global>{`
+        .collaboration-title-editor .ProseMirror {
+          min-height: 1.25em;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+
+        .collaboration-title-editor .ProseMirror p {
+          margin: 0;
+        }
+
+        /* Only show a collaborator's caret in the field they currently have focused. */
+        .collaboration-field-remote-inactive .collaboration-carets__caret,
+        .collaboration-field-remote-inactive .collaboration-carets__label,
+        .collaboration-field-remote-inactive .collaboration-carets__selection {
+          display: none !important;
+        }
+
+        /* Liveblocks/Tiptap remote caret: do not transform or size this element. */
+        .ProseMirror .collaboration-carets__caret {
+          position: relative;
+          margin-left: -1px;
+          margin-right: -1px;
+          border-left: 1px solid currentColor;
+          border-right: 1px solid currentColor;
+          pointer-events: none;
+          word-break: normal;
+        }
+
+        .ProseMirror .collaboration-carets__label {
+          position: absolute;
+          top: -1.35em;
+          left: -1px;
+          z-index: 30;
+          color: #fff;
+          background: currentColor;
+          padding: 2px 6px;
+          border-radius: 3px 3px 3px 0;
+          font-size: 12px;
+          font-weight: 600;
+          line-height: 1;
+          white-space: nowrap;
+          user-select: none;
+          pointer-events: none;
+        }
+
+        .ProseMirror .collaboration-carets__selection {
+          background: currentColor;
+          opacity: 0.25;
+          pointer-events: none;
+        }
+      `}</style>
     </div>
   );
 };
@@ -2083,11 +2518,12 @@ const NewPostEditor = (props: NewPostEditorProps) => {
   }
 
   const authEndpoint = async (room?: string) => {
-    const response = await fetch("http://localhost:8080/api/liveblocks/auth", {
+    const response = await fetch(`${API_BASE_URL}/liveblocks/auth`, {
       method: "POST",
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json",
       },
       body: JSON.stringify({
         room,
@@ -2109,17 +2545,22 @@ const NewPostEditor = (props: NewPostEditorProps) => {
 
   return (
     <LiveblocksProvider authEndpoint={authEndpoint}>
-      <RoomProvider id={`post:${activePostId}`}>
+      <RoomProvider
+        id={`post:${activePostId}`}
+        initialPresence={{ activeField: null }}
+      >
         <ClientSideSuspense
           fallback={
-            <div className="w-full max-w-5xl mx-auto">
+            <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-500">
                 Connecting to realtime collaboration...
               </div>
             </div>
           }
         >
-          <LiveblocksTiptapBridge {...editorProps} />
+          <CollaborationFieldPresenceProvider>
+            <LiveblocksTiptapBridge {...editorProps} />
+          </CollaborationFieldPresenceProvider>
         </ClientSideSuspense>
       </RoomProvider>
     </LiveblocksProvider>

@@ -177,8 +177,19 @@ exports.updatePost = async (req, res) => {
     const { postId } = req.params;
     const { title, document, tags } = req.body;
 
+    if (!postId) {
+      return res.status(400).json({ message: "Post ID is required" });
+    }
+
+    if (!title || typeof title !== "string" || !title.trim()) {
+      return res.status(400).json({ message: "Title is required" });
+    }
+
+    if (!document) {
+      return res.status(400).json({ message: "Document is required" });
+    }
+
     if (
-      !document ||
       typeof document.schemaVersion !== "number" ||
       !Array.isArray(document.blocks)
     ) {
@@ -189,37 +200,53 @@ exports.updatePost = async (req, res) => {
     }
 
     const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const userId = req.session.user._id.toString();
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
 
-    if (!canEditPost(post, userId)) {
-      return res
-        .status(403)
-        .json({ message: "Not authorized to edit this post" });
+    const userId = req.session?.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    if (!canEditPost(post, userId.toString())) {
+      return res.status(403).json({
+        message: "Not authorized to edit this post",
+      });
+    }
+
+    // Store the previous document as a version before replacing it.
+    if (!Array.isArray(post.versions)) {
+      post.versions = [];
     }
 
     post.versions.push({
       document: post.document,
+      editedAt: new Date(),
       editedBy: userId,
     });
 
+    post.title = title.trim();
     post.document = document;
-    if (typeof title === "string") {
-      post.title = title.trim() || "Untitled draft";
-    }
-    if (Array.isArray(tags)) {
-      post.tags = tags;
-    }
+    post.tags = Array.isArray(tags) ? tags : [];
 
     await post.save();
+
     await post.populate("author", "username profileImage");
     await post.populate("collaborators.user", "username profileImage");
 
-    return res.json({ message: "Post updated", post });
+    return res.status(200).json({
+      success: true,
+      message: "Post updated successfully",
+      post,
+    });
   } catch (error) {
     console.error("UPDATE POST ERROR:", error);
+
     return res.status(500).json({
+      success: false,
       message: "Failed to update post",
       error: error.message,
     });
@@ -613,64 +640,68 @@ exports.addCollaborator = async (req, res) => {
     const username =
       typeof req.body.username === "string" ? req.body.username.trim() : "";
 
-    const role = req.body.role || "editor";
+    const role = req.body.role === "commenter" ? "commenter" : "editor";
 
-    // --------------------------------------------------
-    // 1. Validate logged-in user
-    // --------------------------------------------------
+    // ============================================================
+    // 1. CHECK AUTHENTICATION
+    // ============================================================
 
     const currentUser = req.session?.user;
 
     if (!currentUser?._id) {
       return res.status(401).json({
+        success: false,
         message: "Authentication required. Please log in.",
       });
     }
 
     const currentUserId = currentUser._id.toString();
 
-    // --------------------------------------------------
-    // 2. Validate request
-    // --------------------------------------------------
+    // ============================================================
+    // 2. VALIDATE REQUEST
+    // ============================================================
 
     if (!username) {
       return res.status(400).json({
+        success: false,
         message: "Username is required.",
       });
     }
 
     if (!["editor", "commenter"].includes(role)) {
       return res.status(400).json({
+        success: false,
         message: "Role must be either editor or commenter.",
       });
     }
 
-    // --------------------------------------------------
-    // 3. Find post
-    // --------------------------------------------------
+    // ============================================================
+    // 3. FIND POST
+    // ============================================================
 
     const post = await Post.findById(postId);
 
     if (!post) {
       return res.status(404).json({
+        success: false,
         message: "Post not found.",
       });
     }
 
-    // --------------------------------------------------
-    // 4. Check permission
-    // Only the owner can invite collaborators
-    // --------------------------------------------------
+    // ============================================================
+    // 4. ONLY OWNER CAN INVITE
+    // ============================================================
 
     if (!canManageCollaborators(post, currentUserId)) {
       return res.status(403).json({
+        success: false,
         message: "You are not authorized to manage collaborators.",
       });
     }
 
-    // --------------------------------------------------
-    // 5. Find the user being invited
-    // --------------------------------------------------
+    // ============================================================
+    // 5. FIND USER BY USERNAME
+    // ============================================================
 
     const collaboratorUser = await User.findOne({
       username: {
@@ -680,39 +711,44 @@ exports.addCollaborator = async (req, res) => {
 
     if (!collaboratorUser) {
       return res.status(404).json({
+        success: false,
         message: `User "@${username}" was not found.`,
       });
     }
 
     const collaboratorUserId = collaboratorUser._id.toString();
 
-    // --------------------------------------------------
-    // 6. Prevent inviting yourself
-    // --------------------------------------------------
+    // ============================================================
+    // 6. PREVENT SELF INVITE
+    // ============================================================
 
     if (collaboratorUserId === currentUserId) {
       return res.status(400).json({
+        success: false,
         message: "You cannot invite yourself as a collaborator.",
       });
     }
 
-    // --------------------------------------------------
-    // 7. Check existing collaborator
-    // --------------------------------------------------
+    // ============================================================
+    // 7. CHECK EXISTING COLLABORATOR
+    // ============================================================
 
-    const existingCollaborator = post.collaborators?.find(
-      (entry) => entry.user && entry.user.toString() === collaboratorUserId,
-    );
+    const existingCollaborator = Array.isArray(post.collaborators)
+      ? post.collaborators.find(
+          (entry) => entry.user && entry.user.toString() === collaboratorUserId,
+        )
+      : null;
 
     if (existingCollaborator) {
       return res.status(400).json({
+        success: false,
         message: "This user is already a collaborator.",
       });
     }
 
-    // --------------------------------------------------
-    // 8. Check for existing pending invite
-    // --------------------------------------------------
+    // ============================================================
+    // 8. CHECK EXISTING PENDING INVITE
+    // ============================================================
 
     const existingInvite = await Invite.findOne({
       post: post._id,
@@ -722,36 +758,48 @@ exports.addCollaborator = async (req, res) => {
 
     if (existingInvite) {
       return res.status(400).json({
+        success: false,
         message: "An invitation has already been sent to this user.",
       });
     }
 
-    // --------------------------------------------------
-    // 9. Create collaboration invite
-    // --------------------------------------------------
+    // ============================================================
+    // 9. ENABLE COLLABORATION
+    // ============================================================
+
+    post.collaborationEnabled = true;
+
+    await post.save();
+
+    // ============================================================
+    // 10. CREATE INVITE
+    // ============================================================
 
     const invite = await Invite.create({
       post: post._id,
-      sender: req.session.user._id,
+      sender: currentUser._id,
       receiver: collaboratorUser._id,
-      role: role || "editor",
+      role,
       token: crypto.randomUUID(),
       status: "pending",
     });
 
-    // --------------------------------------------------
-    // 10. Create notification
-    //
-    // IMPORTANT:
-    // Your Notification schema uses:
-    //
-    // receiver
-    // sender
-    // type
-    // post
-    // message
-    // read
-    // --------------------------------------------------
+    console.log("\n========================================");
+    console.log("      COLLABORATION INVITE CREATED");
+    console.log("========================================");
+
+    console.log({
+      inviteId: invite._id.toString(),
+      postId: post._id.toString(),
+      sender: currentUserId,
+      receiver: collaboratorUserId,
+      role: invite.role,
+      status: invite.status,
+    });
+
+    // ============================================================
+    // 11. CREATE NOTIFICATION
+    // ============================================================
 
     const notification = await Notification.create({
       receiver: collaboratorUser._id,
@@ -759,39 +807,67 @@ exports.addCollaborator = async (req, res) => {
       type: "invite",
       post: post._id,
       relatedInvite: invite._id,
-      message: `${currentUser.username || "Someone"} invited you to collaborate on "${post.title}".`,
+      message: `${
+        currentUser.username || "Someone"
+      } invited you to collaborate on "${post.title}".`,
       read: false,
     });
 
-    console.log("[COLLABORATION INVITE CREATED]", {
-      inviteId: invite._id.toString(),
-      notificationId: notification._id.toString(),
-      sender: currentUserId,
-      receiver: collaboratorUserId,
-      postId: post._id.toString(),
-      role,
-    });
+    console.log("\n[COLLABORATION] NOTIFICATION CREATED");
 
-    // --------------------------------------------------
-    // 11. Populate response data
-    // --------------------------------------------------
+    console.log(JSON.stringify(notification.toObject(), null, 2));
+
+    // ============================================================
+    // 12. VERIFY NOTIFICATION IN MONGODB
+    // ============================================================
+
+    const verifiedNotification = await Notification.findById(
+      notification._id,
+    ).lean();
+
+    console.log("\n[COLLABORATION] VERIFIED NOTIFICATION");
+
+    console.log(JSON.stringify(verifiedNotification, null, 2));
+
+    // ============================================================
+    // 13. VERIFY INVITE IN MONGODB
+    // ============================================================
+
+    const verifiedInvite = await Invite.findById(invite._id).lean();
+
+    console.log("\n[COLLABORATION] VERIFIED INVITE");
+
+    console.log(JSON.stringify(verifiedInvite, null, 2));
+
+    console.log("\n========================================\n");
+
+    // ============================================================
+    // 14. POPULATE INVITE FOR RESPONSE
+    // ============================================================
 
     await invite.populate("sender", "username profileImage");
 
     await invite.populate("receiver", "username profileImage");
 
-    // --------------------------------------------------
-    // 12. Send response
-    // --------------------------------------------------
+    // ============================================================
+    // 15. RESPONSE
+    // ============================================================
 
     return res.status(201).json({
       success: true,
       message: `Invitation sent to @${collaboratorUser.username}.`,
       invite,
       notification,
+      postId: post._id.toString(),
     });
   } catch (error) {
-    console.error("[ADD COLLABORATOR ERROR]", error);
+    console.error("\n========================================");
+
+    console.error("[ADD COLLABORATOR ERROR]");
+
+    console.error(error);
+
+    console.error("========================================\n");
 
     return res.status(500).json({
       success: false,
@@ -1006,5 +1082,65 @@ exports.toggleCollaboration = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updatePostTitle = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { title } = req.body;
+
+    if (typeof title !== "string") {
+      return res.status(400).json({
+        message: "Title must be a string.",
+      });
+    }
+
+    const trimmedTitle = title.trim();
+
+    if (!trimmedTitle) {
+      return res.status(400).json({
+        message: "Title cannot be empty.",
+      });
+    }
+
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({
+        message: "Post not found.",
+      });
+    }
+
+    const userId = req.session?.user?._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required.",
+      });
+    }
+
+    if (!canEditPost(post, userId)) {
+      return res.status(403).json({
+        message: "Not authorized to edit this post.",
+      });
+    }
+
+    post.title = trimmedTitle;
+
+    await post.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Post title updated.",
+      post,
+    });
+  } catch (error) {
+    console.error("[UPDATE POST TITLE ERROR]", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update post title.",
+    });
   }
 };
