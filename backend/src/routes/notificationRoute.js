@@ -1,34 +1,14 @@
-exports.getNotifications = async (
-  req,
-  res,
-) => {
-  try {
-    const notifications =
-      await Notification.find({
-        recipient:
-          req.session.user._id,
-      })
-        .sort({
-          createdAt: -1,
-        })
-        .populate(
-          "sender",
-          "username profilePicture",
-        )
-        .populate(
-          "post",
-          "title",
-        );
+const express = require("express");
 
-    res.json({
-      notifications,
-    });
-  } catch (error) {
-    console.error(error);
+const {
+  getNotifications,
+  markAsRead,
+} = require("../controllers/notificationController.js");
 
-    res.status(500).json({
-      message:
-        "Failed to fetch notifications",
-    });
-  }
-};
+const router = express.Router();
+
+router.get("/", getNotifications);
+
+router.patch("/:id/read", markAsRead);
+
+module.exports = router;

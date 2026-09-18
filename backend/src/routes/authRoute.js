@@ -1,10 +1,10 @@
 const express = require("express");
 
 const router = express.Router();
-
-const userController = require(
-  "../controllers/userController",
-);
+const userController = require("../controllers/userController.js");
+const oauthController = require("../controllers/oauthController.js");
+// Register new user
+router.post("/register", userController.registerUser);
 
 // -----------------------------------
 // REGISTER
@@ -85,5 +85,8 @@ router.get(
   },
 );
 
-module.exports =
-  router;
+router.get("/google", oauthController.googleLogin);
+
+router.get("/google/callback", oauthController.googleCallback);
+
+module.exports = router;

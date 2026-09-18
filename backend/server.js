@@ -1,35 +1,32 @@
-// server.js
+const dns = require("node:dns");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
+require("dotenv").config();
 
 const express = require("express");
 const mongoose = require("mongoose");
-const dotenv = require("dotenv");
 const cors = require("cors");
 
 const { createServer } = require("http");
-const { Server } = require("socket.io");
 
-dotenv.config();
+// ─── Middleware ────────────────────────────────────────────────
+const sessionMiddleware = require("./src/middleware/session.js");
+const auth = require("./src/middleware/auth.js");
 
-const sessionMiddleware =
-  require("./src/middleware/session.js");
+// ─── Routes ───────────────────────────────────────────────────
+const authRoutes = require("./src/routes/authRoute.js");
+const postRoutes = require("./src/routes/postRoute.js");
+const userRoutes = require("./src/routes/userRoute.js");
+const profileRoutes = require("./src/routes/profileRoute.js");
+const feedRoute = require("./src/routes/feedRoute.js");
+const statsRoute = require("./src/routes/statsRoute.js");
+const inviteRoute = require("./src/routes/inviteRoute.js");
+const notificationRoute = require("./src/routes/notificationRoute.js");
+const liveblocksRoute = require("./src/routes/liveblocksRoute.js");
 
-const postRoutes =
-  require("./src/routes/postRoute.js");
-
-const userRoutes =
-  require("./src/routes/userRoute.js");
-
-const profileRoutes =
-  require("./src/routes/profileRoute.js");
-
-const feedRoute =
-  require("./src/routes/feedRoute.js");
-
-const authRoutes =
-  require("./src/routes/authRoute.js");
-
-const statsRoute =
-  require("./src/routes/statsRoute.js");
+// ──────────────────────────────────────────────────────────────
+// APP
+// ──────────────────────────────────────────────────────────────
 
 const app = express();
 
@@ -39,6 +36,10 @@ const server =
 // --------------------------------------
 // CORS
 // --------------------------------------
+
+// ──────────────────────────────────────────────────────────────
+// CORS
+// ──────────────────────────────────────────────────────────────
 
 app.use(
   cors({
@@ -50,416 +51,154 @@ app.use(
   }),
 );
 
-// --------------------------------------
-// BODY PARSER
-// --------------------------------------
+// ──────────────────────────────────────────────────────────────
+// BODY PARSING
+// ──────────────────────────────────────────────────────────────
 
-app.use(
-  express.json(),
-);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-// --------------------------------------
+// ──────────────────────────────────────────────────────────────
 // SESSION
-// --------------------------------------
+// ──────────────────────────────────────────────────────────────
 
-app.use(
-  sessionMiddleware,
-);
+app.use(sessionMiddleware);
 
-// --------------------------------------
+// ──────────────────────────────────────────────────────────────
+// AUTH ROUTES
+// ──────────────────────────────────────────────────────────────
+
+app.use("/api/auth", authRoutes);
+
+// ──────────────────────────────────────────────────────────────
 // DATABASE
-// --------------------------------------
+// ──────────────────────────────────────────────────────────────
 
 mongoose
-  .connect(
-    process.env.MONGO_URL,
-  )
+  .connect(process.env.MONGO_URL)
   .then(() => {
-    console.log(
-      "Connected to MongoDB",
-    );
+    console.log("Connected to MongoDB");
   })
-  .catch(
-    console.error,
-  );
-
-// --------------------------------------
-// ROUTES
-// --------------------------------------
-
-app.get(
-  "/",
-  (
-    req,
-    res,
-  ) => {
-    res.send(
-      "Backend is Running!",
-    );
-  },
-);
-
-app.use(
-  "/api/auth",
-  authRoutes,
-);
-
-app.use(
-  "/api/posts",
-  postRoutes,
-);
-
-app.use(
-  "/api/users",
-  userRoutes,
-);
-
-app.use(
-  "/api/profile",
-  profileRoutes,
-);
-
-app.use(
-  "/api/feed",
-  feedRoute,
-);
-
-app.use(
-  "/api/stats",
-  statsRoute,
-);
-
-// --------------------------------------
-// SOCKET.IO
-// --------------------------------------
-
-const io =
-  new Server(
-    server,
-    {
-      cors: {
-        origin:
-          "http://localhost:3000",
-
-        credentials:
-          true,
-      },
-    },
-  );
-
-// expose to controllers
-
-app.set(
-  "io",
-  io,
-);
-
-const activeUsers =
-  new Map();
-
-app.set(
-  "activeUsers",
-  activeUsers,
-);
-
-// --------------------------------------
-// COLLABORATION NAMESPACE
-// --------------------------------------
-
-const collaboration =
-  io.of(
-    "/collaboration",
-  );
-
-// --------------------------------------
-// AUTH MIDDLEWARE
-// --------------------------------------
-
-collaboration.use(
-  (
-    socket,
-    next,
-  ) => {
-
-    sessionMiddleware(
-      socket.request,
-      {},
-      (
-        err,
-      ) => {
-
-        if (err) {
-          return next(
-            err,
-          );
-        }
-
-        const session =
-          socket.request
-            .session;
-
-        if (
-          !session ||
-          !session.user
-        ) {
-          console.log(
-            "Unauthorized socket connection",
-          );
-
-          return next(
-            new Error(
-              "Unauthorized",
-            ),
-          );
-        }
-
-        socket.user =
-          session.user;
-
-        next();
-      },
-    );
-  },
-);
-
-// --------------------------------------
-// CONNECTION
-// --------------------------------------
-
-collaboration.on(
-  "connection",
-  (
-    socket,
-  ) => {
-
-    console.log(
-      "Socket connected:",
-      socket.user
-        .username,
-    );
-
-    // ---------------------------
-    // REGISTER USER
-    // ---------------------------
-
-    socket.on(
-      "register-user",
-      (
-        userId,
-      ) => {
-
-        if (
-          !userId
-        ) {
-          return;
-        }
-
-        activeUsers.set(
-          userId.toString(),
-          socket.id,
-        );
-
-        console.log(
-          "User registered:",
-          userId.toString(),
-        );
-
-        console.log(
-          "Active users:",
-          activeUsers.size,
-        );
-      },
-    );
-
-    // ---------------------------
-    // JOIN POST
-    // ---------------------------
-
-    socket.on(
-      "join:post",
-      ({
-        postId,
-      }) => {
-
-        if (
-          !postId
-        ) {
-          return;
-        }
-
-        socket.join(
-          postId,
-        );
-
-        console.log(
-          `Socket ${socket.id} joined post ${postId}`,
-        );
-
-        socket
-          .to(
-            postId,
-          )
-          .emit(
-            "user:joined",
-            {
-              socketId:
-                socket.id,
-
-              username:
-                socket.user
-                  .username,
-            },
-          );
-      },
-    );
-
-    // ---------------------------
-    // LEAVE POST
-    // ---------------------------
-
-    socket.on(
-      "leave:post",
-      ({
-        postId,
-      }) => {
-
-        if (
-          !postId
-        ) {
-          return;
-        }
-
-        socket.leave(
-          postId,
-        );
-
-        console.log(
-          `Socket ${socket.id} left post ${postId}`,
-        );
-      },
-    );
-
-    // ---------------------------
-    // EDITOR OPS
-    // ---------------------------
-
-    socket.on(
-      "editor-operation",
-      ({
-        documentId,
-        operation,
-      }) => {
-
-        if (
-          !documentId ||
-          !operation
-        ) {
-          return;
-        }
-
-        socket
-          .to(
-            documentId,
-          )
-          .emit(
-            "receive-operation",
-            operation,
-          );
-      },
-    );
-
-    // ---------------------------
-    // CURSOR
-    // ---------------------------
-
-    socket.on(
-      "cursor-update",
-      ({
-        documentId,
-        cursor,
-      }) => {
-
-        if (
-          !documentId ||
-          !cursor
-        ) {
-          return;
-        }
-
-        socket
-          .to(
-            documentId,
-          )
-          .emit(
-            "remote-cursor",
-            {
-              userId:
-                socket.user
-                  ._id,
-
-              username:
-                socket.user
-                  .username,
-
-              cursor,
-            },
-          );
-      },
-    );
-
-    // ---------------------------
-    // DISCONNECT
-    // ---------------------------
-
-    socket.on(
-      "disconnect",
-      () => {
-
-        for (
-          const [
-            userId,
-            socketId,
-          ] of activeUsers.entries()
-        ) {
-          if (
-            socketId ===
-            socket.id
-          ) {
-            activeUsers.delete(
-              userId,
-            );
-
-            break;
-          }
-        }
-
-        console.log(
-          "Socket disconnected:",
-          socket.id,
-        );
-
-        console.log(
-          "Remaining active users:",
-          activeUsers.size,
-        );
-      },
-    );
-  },
-);
-
-// --------------------------------------
-// START
-// --------------------------------------
-
-const PORT =
-  process.env.PORT ||
-  5000;
-
-server.listen(
-  PORT,
-  () => {
-    console.log(
-      `Server running on port ${PORT}`,
-    );
-  },
-);
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+  });
+
+// ──────────────────────────────────────────────────────────────
+// HEALTH CHECK
+// ──────────────────────────────────────────────────────────────
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Blogie backend is running",
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// PUBLIC / NORMAL API ROUTES
+// ──────────────────────────────────────────────────────────────
+
+app.use("/api/posts", postRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/feed", feedRoute);
+app.use("/api/stats", statsRoute);
+
+// ──────────────────────────────────────────────────────────────
+// AUTHENTICATED ROUTES
+// ──────────────────────────────────────────────────────────────
+
+app.use("/api/invites", auth, inviteRoute);
+
+app.use("/api/notifications", auth, notificationRoute);
+
+// ──────────────────────────────────────────────────────────────
+// LIVEBLOCKS AUTHENTICATION
+// ──────────────────────────────────────────────────────────────
+//
+// The frontend calls:
+//
+// POST /api/liveblocks/auth
+//
+// The `auth` middleware authenticates the Blogie user first.
+// The Liveblocks controller then checks whether that user:
+//
+// owner    -> write
+// editor   -> write
+// commenter -> read
+//
+// IMPORTANT:
+// The Liveblocks secret key NEVER goes to the frontend.
+//
+
+app.use("/api/liveblocks", liveblocksRoute);
+
+// ──────────────────────────────────────────────────────────────
+// 404 HANDLER
+// ──────────────────────────────────────────────────────────────
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// ERROR HANDLER
+// ──────────────────────────────────────────────────────────────
+
+app.use((err, req, res, next) => {
+  console.error("Unhandled backend error:", err);
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal server error",
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// HTTP SERVER
+// ──────────────────────────────────────────────────────────────
+
+const PORT = Number(process.env.PORT) || 8080;
+
+server.listen(PORT, () => {
+  console.log("======================================");
+  console.log(`Blogie backend running on port ${PORT}`);
+  console.log(`Health: http://localhost:${PORT}/`);
+  console.log(`Liveblocks: http://localhost:${PORT}/api/liveblocks/auth`);
+  console.log("Realtime: Liveblocks");
+  console.log("======================================");
+});
+
+// ──────────────────────────────────────────────────────────────
+// GRACEFUL SHUTDOWN
+// ──────────────────────────────────────────────────────────────
+
+const shutdown = async (signal) => {
+  console.log(`\n${signal} received. Shutting down...`);
+
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
+      console.log("MongoDB connection closed");
+      process.exit(0);
+    } catch (error) {
+      console.error("Error closing MongoDB:", error);
+      process.exit(1);
+    }
+  });
+};
+
+process.on("SIGINT", () => {
+  shutdown("SIGINT");
+});
+
+process.on("SIGTERM", () => {
+  shutdown("SIGTERM");
+});

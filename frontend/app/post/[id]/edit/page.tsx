@@ -1,13 +1,20 @@
-"use client"
-import dynamic from 'next/dynamic'
-import { useParams } from 'next/navigation'
+"use client";
 
-const NewPostEditor = dynamic(() => import('../../../Components/NewPostEditor'), {
-  ssr: false,
-})
+import { useParams } from "next/navigation";
+import NewPostEditor from "../../../Components/NewPostEditor";
 
 export default function EditPostPage() {
-  const params = useParams()
-  const postId = params.id as string
+  const params = useParams();
 
-  return <NewPostEditor initialPostId={postId} />
+  const postId = typeof params.id === "string" ? params.id : "";
+
+  if (!postId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500">Loading editor...</p>
+      </div>
+    );
+  }
+
+  return <NewPostEditor postId={postId} />;
+}

@@ -1,20 +1,100 @@
-const Notification = require("../models/Notification");
+const Notification = require("../models/Notification.js");
 
 exports.getNotifications = async (req, res) => {
-  const notifications = await Notification.find({
-    receiver: req.session.user._id,
-  })
-    .populate("sender", "username")
-    .populate("post", "title")
-    .sort({ createdAt: -1 });
+  try {
+    const userId = req.session?.user?._id;
 
-  res.json(notifications);
+    console.log("\n========================================");
+    console.log("       GET NOTIFICATIONS");
+    console.log("========================================");
+    console.log("Session ID:", req.sessionID);
+    console.log("Session user:", req.session?.user);
+    console.log("User ID:", userId);
+
+    if (!userId) {
+      console.log("[NOTIFICATIONS] No authenticated user.");
+
+      return res.status(401).json({
+        message: "Not authenticated",
+      });
+    }
+
+    const notifications = await Notification.find({
+      receiver: userId,
+    })
+      .populate("sender", "username profileImage")
+      .populate("post", "title")
+      .populate("relatedInvite", "role status sender receiver post")
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
+
+    console.log("[NOTIFICATIONS] Found:", notifications.length);
+
+    console.log(
+      "[NOTIFICATIONS] Data:",
+      JSON.stringify(notifications, null, 2),
+    );
+
+    console.log("========================================\n");
+
+    return res.status(200).json({
+      success: true,
+      notifications,
+    });
+  } catch (error) {
+    console.error("[GET NOTIFICATIONS ERROR]", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch notifications",
+    });
+  }
 };
 
 exports.markAsRead = async (req, res) => {
-  const { id } = req.params;
+  try {
+    const userId = req.session?.user?._id;
 
-  await Notification.findByIdAndUpdate(id, { read: true });
+    if (!userId) {
+      return res.status(401).json({
+        message: "Not authenticated",
+      });
+    }
 
-  res.json({ message: "Notification read" });
+    const { id } = req.params;
+
+    const notification = await Notification.findOneAndUpdate(
+      {
+        _id: id,
+        receiver: userId,
+      },
+      {
+        read: true,
+      },
+      {
+        new: true,
+      },
+    );
+
+    if (!notification) {
+      return res.status(404).json({
+        message: "Notification not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Notification marked as read",
+      notification,
+    });
+  } catch (error) {
+    console.error("[MARK NOTIFICATION READ ERROR]", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to mark notification as read",
+    });
+  }
 };

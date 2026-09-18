@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";  // ← ADD THIS
+import { cookies } from "next/headers";
 import PostViewer from "../../Components/PostViewer";
 
 // Fetch post on server (with auth + logs)
@@ -13,7 +13,7 @@ async function getPost(id: string) {
     .join("; ");
 
   try {
-    const res = await fetch(`http://localhost:5000/api/posts/${id}`, {
+    const res = await fetch(`http://localhost:8080/api/posts/${id}`, {
       cache: "no-store",
       headers: {
         Cookie: cookieHeader, // ✅ works
@@ -32,7 +32,6 @@ async function getPost(id: string) {
   }
 }
 
-
 export default async function PostPage({
   params,
 }: {
@@ -42,18 +41,26 @@ export default async function PostPage({
   const post = await getPost(id);
 
   if (!post) {
-    notFound();  // Or custom "Post not found" UI
+    notFound(); // Or custom "Post not found" UI
   }
 
-  return <PostViewer post={post} />;
+  const canCollaborate =
+    post.currentUserRole === "owner" ||
+    post.currentUserRole === "editor" ||
+    post.currentUserRole === "commenter";
+
+  return (
+    <div>
+      {post.currentUserRole === "owner" && !post.collaborationEnabled && (
+        <div className="max-w-3xl mx-auto px-4 pt-8 text-right">hi</div>
+      )}
+      <PostViewer post={post} />
+    </div>
+  );
 }
 
 // SEO
-export async function generateMetadata({
-  params,
-}: {
-  params: { id: string };
-}) {
+export async function generateMetadata({ params }: { params: { id: string } }) {
   return {
     title: "Post | BLOGIE",
     description: "Read on BLOGIE",

@@ -8,190 +8,173 @@ const postController = require(
 
 const router = express.Router();
 
-// -----------------------------------------------------
-// DRAFT + COLLABORATIVE EDITOR
-// -----------------------------------------------------
+/*
+|--------------------------------------------------------------------------
+| CREATE / READ POSTS
+|--------------------------------------------------------------------------
+*/
 
-router.post(
-  "/draft",
-  auth,
-  postController.createDraftPost,
-);
+// Create a normal post
+router.post("/", auth, postController.createPost);
 
-router.get(
-  "/:postId/collaborative",
-  auth,
-  postController.getCollaborativePost,
-);
+// Create an unpublished collaborative draft
+//
+// IMPORTANT:
+// This must come before /:postId routes.
+router.post("/draft", auth, postController.createDraft);
 
-router.patch(
-  "/:postId/document",
-  auth,
-  postController.updateDocument,
-);
+// Get all posts
+router.get("/", auth, postController.getAllPosts);
 
-// -----------------------------------------------------
-// CRUD POSTS
-// -----------------------------------------------------
+// Search posts
+router.get("/search", postController.searchPosts);
 
-router.post(
-  "/",
-  auth,
-  postController.createPost,
-);
+// Get all saved posts for current user
+router.get("/saved", auth, postController.getSavedPosts);
 
-router.get(
-  "/",
-  auth,
-  postController.getAllPosts,
-);
+/*
+|--------------------------------------------------------------------------
+| SINGLE POST
+|--------------------------------------------------------------------------
+*/
 
-router.get(
-  "/search",
-  postController.searchPosts,
-);
+// Get post by ID
+router.get("/:postId", auth, postController.getPostById);
 
-router.get(
-  "/saved",
-  auth,
-  postController.getSavedPosts,
-);
+// Update post
+router.put("/:postId", auth, postController.updatePost);
 
-router.get(
-  "/:postId",
-  auth,
-  postController.getPostById,
-);
+// Delete post
+router.delete("/:postId", auth, postController.deletePost);
 
-router.put(
-  "/:postId",
-  auth,
-  postController.updatePost,
-);
+/*
+|--------------------------------------------------------------------------
+| PUBLISH / UNPUBLISH
+|--------------------------------------------------------------------------
+*/
 
-router.delete(
-  "/:postId",
-  auth,
-  postController.deletePost,
-);
+// Publish post
+router.patch("/:postId/publish", auth, postController.publishPost);
 
-// -----------------------------------------------------
-// PUBLISH / UNPUBLISH
-// -----------------------------------------------------
+// Unpublish post
+router.patch("/:postId/unpublish", auth, postController.unpublishPost);
 
-router.patch(
-  "/:postId/publish",
-  auth,
-  postController.publishPost,
-);
+/*
+|--------------------------------------------------------------------------
+| AUTOSAVE
+|--------------------------------------------------------------------------
+*/
 
-router.patch(
-  "/:postId/unpublish",
-  auth,
-  postController.unpublishPost,
-);
+// Autosave post
+router.patch("/:postId/autosave", auth, postController.autoSave);
 
-// -----------------------------------------------------
-// LIKES
-// -----------------------------------------------------
+// Update collaborative post title
+//
+// Owner and editor collaborators can update the title.
+// Commenters are not allowed to update the title.
+router.patch("/:postId/title", auth, postController.updatePostTitle);
 
-router.post(
-  "/:postId/like",
-  auth,
-  postController.likePost,
-);
+/*
+|--------------------------------------------------------------------------
+| COLLABORATION
+|--------------------------------------------------------------------------
+*/
 
-router.delete(
-  "/:postId/like",
-  auth,
-  postController.unlikePost,
-);
+// Add collaborator / send invitation
+router.post("/:postId/collaborators", auth, postController.addCollaborator);
 
-router.get(
-  "/:postId/likes",
-  auth,
-  postController.getPeopleWhoLikedPost,
-);
-
-// -----------------------------------------------------
-// COMMENTS
-// -----------------------------------------------------
-
-router.post(
-  "/:postId/comment",
-  auth,
-  postController.addComment,
-);
-
-router.get(
-  "/:postId/comments",
-  postController.getCommentsForPost,
-);
-
-router.delete(
-  "/:postId/comments/:commentId",
-  auth,
-  postController.deleteComment,
-);
-
-router.put(
-  "/:postId/comments/:commentId",
-  auth,
-  postController.editComment,
-);
-
-// -----------------------------------------------------
-// COMMENT LIKES
-// -----------------------------------------------------
-
-router.post(
-  "/:postId/comments/:commentId/like",
-  auth,
-  postController.likeComment,
-);
-
-router.delete(
-  "/:postId/comments/:commentId/like",
-  auth,
-  postController.unlikeComment,
-);
-
-// -----------------------------------------------------
-// SAVE / UNSAVE
-// -----------------------------------------------------
-
-router.post(
-  "/:postId/save",
-  auth,
-  postController.savePost,
-);
-
-router.delete(
-  "/:postId/save",
-  auth,
-  postController.unsavePost,
-);
-
-// -----------------------------------------------------
-// COLLABORATION
-// -----------------------------------------------------
-
-router.post(
-  "/:postId/collaborators",
-  auth,
-  postController.addCollaborator,
-);
-
+// Remove collaborator
 router.delete(
   "/:postId/collaborators",
   auth,
   postController.removeCollaborator,
 );
 
+// Update collaborator role
+//
+// Supported roles:
+// - editor
+// - commenter
 router.patch(
   "/:postId/collaborators/role",
   auth,
   postController.updateCollaboratorRole,
 );
+
+// Enable / disable realtime collaboration
+router.patch(
+  "/:postId/collaboration",
+  auth,
+  postController.toggleCollaboration,
+);
+
+/*
+|--------------------------------------------------------------------------
+| LIKES
+|--------------------------------------------------------------------------
+*/
+
+// Like post
+router.post("/:postId/like", auth, postController.likePost);
+
+// Unlike post
+router.delete("/:postId/like", auth, postController.unlikePost);
+
+// Get people who liked post
+router.get("/:postId/likes", auth, postController.getPeopleWhoLikedPost);
+
+/*
+|--------------------------------------------------------------------------
+| COMMENTS
+|--------------------------------------------------------------------------
+*/
+
+// Add comment
+router.post("/:postId/comment", auth, postController.addComment);
+
+// Get comments
+router.get("/:postId/comments", postController.getCommentsForPost);
+
+// Delete comment
+router.delete(
+  "/:postId/comments/:commentId",
+  auth,
+  postController.deleteComment,
+);
+
+// Edit comment
+router.put("/:postId/comments/:commentId", auth, postController.editComment);
+
+/*
+|--------------------------------------------------------------------------
+| COMMENT LIKES
+|--------------------------------------------------------------------------
+*/
+
+// Like comment
+router.post(
+  "/:postId/comments/:commentId/like",
+  auth,
+  postController.likeComment,
+);
+
+// Unlike comment
+router.delete(
+  "/:postId/comments/:commentId/like",
+  auth,
+  postController.unlikeComment,
+);
+
+/*
+|--------------------------------------------------------------------------
+| SAVED POSTS
+|--------------------------------------------------------------------------
+*/
+
+// Save post
+router.post("/:postId/save", auth, postController.savePost);
+
+// Unsave post
+router.delete("/:postId/save", auth, postController.unsavePost);
 
 module.exports = router;

@@ -9,7 +9,6 @@ import "./globals.css";
 import AppLayout from "./Components/AppLayout";
 
 import { AuthProvider } from "./Context/AuthContext";
-import { SocketProvider } from "./Context/SocketContext";
 
 const geistSans = Geist({
   variable:
@@ -43,15 +42,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
+          <AppLayout>
 
-          <SocketProvider>
-
-            <AppLayout>
-              {children}
-            </AppLayout>
-
-          </SocketProvider>
-
+            {children}
+          </AppLayout>
         </AuthProvider>
       </body>
     </html>
