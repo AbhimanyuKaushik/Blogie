@@ -12,34 +12,100 @@ import {
   Sparkles,
   Twitter,
   User,
+  Trophy,
+  Clapperboard,
+  Landmark,
+  Gamepad2,
+  Cpu,
+  Music2,
+  Plane,
+  Utensils,
+  Dumbbell,
+  BookOpen,
+  Palette,
+  Camera,
+  Shirt,
+  BriefcaseBusiness,
+  FlaskConical,
+  GraduationCap,
+  Trees,
+  Tv,
 } from "lucide-react";
 import InterestCard from "../Components/InterestCard";
 
 const INTERESTS = [
-  ["Sports", "https://images.unsplash.com/photo-1517649763962-0c623066013b"],
-  ["Movies", "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba"],
-  ["Politics", "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620"],
-  ["Gaming", "https://images.unsplash.com/photo-1511512578047-dfb367046420"],
-  [
-    "Technology",
-    "https://images.unsplash.com/photo-1518770660439-4636190af475",
-  ],
-  ["Music", "https://images.unsplash.com/photo-1511379938547-c1f69419868d"],
-  ["Travel", "https://images.unsplash.com/photo-1488646953014-85cb44e25828"],
-  ["Food", "https://images.unsplash.com/photo-1504674900247-0877df9cc836"],
-  ["Fitness", "https://images.unsplash.com/photo-1534438327276-14e5300c3a48"],
-  ["Books", "https://images.unsplash.com/photo-1495446815901-a7297e633e8d"],
-  ["Art", "https://images.unsplash.com/photo-1561214115-f2f134cc4912"],
-  [
-    "Photography",
-    "https://images.unsplash.com/photo-1452780212940-6f5c0d14d848",
-  ],
-  ["Fashion", "https://images.unsplash.com/photo-1490481651871-ab68de25d43d"],
-  ["Business", "https://images.unsplash.com/photo-1556761175-b413da4baf72"],
-  ["Science", "https://images.unsplash.com/photo-1532094349884-543bc11b234d"],
-  ["Education", "https://images.unsplash.com/photo-1503676260728-1c00da094a0b"],
-  ["Nature", "https://images.unsplash.com/photo-1441974231531-c6227db76b6e"],
-  ["Anime", "https://images.unsplash.com/photo-1578632767115-351597cf2477"],
+  {
+    title: "Sports",
+    icon: Trophy,
+  },
+  {
+    title: "Movies",
+    icon: Clapperboard,
+  },
+  {
+    title: "Politics",
+    icon: Landmark,
+  },
+  {
+    title: "Gaming",
+    icon: Gamepad2,
+  },
+  {
+    title: "Technology",
+    icon: Cpu,
+  },
+  {
+    title: "Music",
+    icon: Music2,
+  },
+  {
+    title: "Travel",
+    icon: Plane,
+  },
+  {
+    title: "Food",
+    icon: Utensils,
+  },
+  {
+    title: "Fitness",
+    icon: Dumbbell,
+  },
+  {
+    title: "Books",
+    icon: BookOpen,
+  },
+  {
+    title: "Art",
+    icon: Palette,
+  },
+  {
+    title: "Photography",
+    icon: Camera,
+  },
+  {
+    title: "Fashion",
+    icon: Shirt,
+  },
+  {
+    title: "Business",
+    icon: BriefcaseBusiness,
+  },
+  {
+    title: "Science",
+    icon: FlaskConical,
+  },
+  {
+    title: "Education",
+    icon: GraduationCap,
+  },
+  {
+    title: "Nature",
+    icon: Trees,
+  },
+  {
+    title: "Anime",
+    icon: Tv,
+  },
 ];
 
 type FormState = {
@@ -144,7 +210,7 @@ export default function OnboardingPage() {
         throw new Error(data.message || "Unable to save your profile.");
       }
 
-      router.push("/feed");
+      router.push("/");
     } catch (err) {
       console.error("ONBOARDING ERROR:", err);
       setError(
@@ -212,7 +278,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="mx-auto mt-6 grid max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6">
-              {INTERESTS.map(([title, image]) => {
+              {INTERESTS.map(({ title, icon: Icon }) => {
                 const selected = form.interests.includes(title);
 
                 return (
@@ -227,9 +293,10 @@ export default function OnboardingPage() {
                     <InterestCard
                       title={title}
                       selected={selected}
-                      images={image}
+                      icon={Icon}
                       onClick={() => toggleInterest(title)}
                     />
+
                     {selected && (
                       <div className="pointer-events-none absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg">
                         <Check size={15} strokeWidth={3} />
@@ -243,7 +310,7 @@ export default function OnboardingPage() {
             <div className="mx-auto mt-10 flex max-w-6xl flex-col-reverse gap-4 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
-                onClick={() => router.push("/feed")}
+                onClick={() => router.push("/")}
                 className="text-sm font-semibold text-slate-500 hover:text-slate-900"
               >
                 Skip for now
@@ -427,7 +494,7 @@ export default function OnboardingPage() {
             <div className="mt-8 flex flex-col-reverse gap-4 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
-                onClick={() => router.push("/feed")}
+                onClick={() => router.push("/")}
                 disabled={isSubmitting}
                 className="text-sm font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-50"
               >

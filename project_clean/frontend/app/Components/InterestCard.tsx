@@ -1,23 +1,48 @@
-type InterestCardProps ={
-    title: string;
-    selected:boolean;
-    images:string;
-    onClick:()=> void;
+"use client";
+
+import type { LucideIcon } from "lucide-react";
+
+type InterestCardProps = {
+  title: string;
+  selected: boolean;
+  icon: LucideIcon;
+  onClick: () => void;
 };
 
-export default function InterestCard({title,selected,images,onClick}: InterestCardProps){
+export default function InterestCard({
+  title,
+  selected,
+  icon: Icon,
+  onClick,
+}: InterestCardProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`relative flex aspect-square w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-2xl border-2 transition-all duration-300 ${
+        selected
+          ? "border-fuchsia-700 bg-fuchsia-50 shadow-md shadow-fuchsia-700/10"
+          : "border-gray-200 bg-white hover:-translate-y-1 hover:border-fuchsia-300 hover:shadow-md"
+      }`}
+    >
+      {/* Interest Icon */}
+      <Icon
+        size={48}
+        strokeWidth={1.8}
+        className={`transition-all duration-300 ${
+          selected ? "scale-110 text-fuchsia-700" : "text-gray-700"
+        }`}
+      />
 
-    return(
-        <div onClick={onClick}  className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border
-        ${selected ? "border-fuchsia-700": "border-gray-200"}
-      `}>
-        <img src={images} className="absolute inset-0 h-full w-full object-cover"></img>   
-        <div className={`absolute inset-0 transition-all duration-300
-        ${selected ? "bg-black/10" : "bg-black/40"}
-      `}/>
-        <div className="relative z-10 flex h-full items-center justify-center">
-            <span className="text-lg text-white">{title}</span>
-        </div>
-        </div>
-    )
+      {/* Interest Title */}
+      <span
+        className={`text-base font-semibold transition-colors duration-300 sm:text-lg ${
+          selected ? "text-fuchsia-700" : "text-gray-800"
+        }`}
+      >
+        {title}
+      </span>
+    </button>
+  );
 }

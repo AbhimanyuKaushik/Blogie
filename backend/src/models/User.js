@@ -11,7 +11,7 @@ const UserSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: false,
     minlength: 6,
   },
   username: {
@@ -39,36 +39,49 @@ const UserSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
-  location:{
-      type:String,
-      default:"",
+  location: {
+    type: String,
+    default: "",
   },
-  social:{
-      instagram:{type:String,default:""},
-      twitter:{type:String,default:""},
-      linkedin:{type:String,default:""},
+  social: {
+    instagram: { type: String, default: "" },
+    twitter: { type: String, default: "" },
+    linkedin: { type: String, default: "" },
   },
-  following:[{
-    type:mongoose.Schema.Types.ObjectId,
-    ref:"User",
-  }],
-  followers:[{
-    type:mongoose.Schema.Types.ObjectId,
-    ref:"User",
-  }],
-  likedPosts:[{
-    type:mongoose.Schema.Types.ObjectId,
-    ref:"Post",
-  }],
-  savedPosts:[{
-    type:mongoose.Schema.Types.ObjectId,
-    ref:"Post",
-  }],
-  savedCount: { 
-    type: Number, 
-    default: 0 
+  following: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
+  followers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
+  likedPosts: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post",
+    },
+  ],
+  savedPosts: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post",
+    },
+  ],
+  savedCount: {
+    type: Number,
+    default: 0,
   },
   isOnboarded: { type: Boolean, default: false },
+  authProvider: {
+    type: String,
+    enum: ["local", "google"],
+    default: "local",
+  },
 });
 
 module.exports = mongoose.model("User", UserSchema);
