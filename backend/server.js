@@ -6,6 +6,7 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+
 const { createServer } = require("http");
 
 // ─── Middleware ────────────────────────────────────────────────
@@ -28,7 +29,13 @@ const liveblocksRoute = require("./src/routes/liveblocksRoute.js");
 // ──────────────────────────────────────────────────────────────
 
 const app = express();
-const server = createServer(app);
+
+const server =
+  createServer(app);
+
+// --------------------------------------
+// CORS
+// --------------------------------------
 
 // ──────────────────────────────────────────────────────────────
 // CORS
@@ -36,8 +43,11 @@ const server = createServer(app);
 
 app.use(
   cors({
-    origin: "http://localhost:3000",
-    credentials: true,
+    origin:
+      "http://localhost:3000",
+
+    credentials:
+      true,
   }),
 );
 

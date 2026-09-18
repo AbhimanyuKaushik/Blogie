@@ -12,6 +12,7 @@ const {
   canManageCollaborators,
   getUserRole,
 } = require("../utils/collaboration.js");
+const Notification = require("../models/Notification.js");
 
 // --------------------- CREATE POST ---------------------
 exports.createPost = async (req, res) => {
@@ -687,6 +688,7 @@ exports.addCollaborator = async (req, res) => {
         message: "Post not found.",
       });
     }
+  };
 
     // ============================================================
     // 4. ONLY OWNER CAN INVITE
@@ -877,70 +879,116 @@ exports.addCollaborator = async (req, res) => {
   }
 };
 
-// --------------------- REMOVE COLLABORATOR ---------------------
-exports.removeCollaborator = async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const { username } = req.body;
+      const before = post.collaborators.length;
 
-    const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: "Post not found" });
+      post.collaborators = post.collaborators.filter(
+        (c) => c.user.toString() !== collaboratorId.toString(),
+      );
 
     if (!canManageCollaborators(post, req.session.user._id.toString())) {
       return res.status(403).json({ message: "Not authorized" });
     }
+  };
 
-    const before = post.collaborators.length;
+  // --------------------- UPDATE COLLABORATOR ROLE ---------------------
+  exports.updateCollaboratorRole = async (req, res) => {
+    try {
+      const { postId } = req.params;
+      const { collaboratorId, role } = req.body;
 
-    const user = await User.findOne({ username });
+      const validRoles = ["editor", "commenter"];
+      if (!validRoles.includes(role))
+        return res.status(400).json({ message: "Invalid role" });
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+      const post = await Post.findById(postId);
+      if (!post) return res.status(404).json({ message: "Post not found" });
 
-    post.collaborators = post.collaborators.filter(
-      (c) => c.user.toString() !== user._id.toString(),
-    );
+      if (post.author.toString() !== req.session.user._id.toString())
+        return res.status(403).json({ message: "Not authorized" });
 
-    if (post.collaborators.length === before)
-      return res.status(400).json({ message: "User is not a collaborator" });
+      const collab = post.collaborators.find(
+        (c) => c.user.toString() === collaboratorId,
+      );
 
-    await post.save();
+      if (!collab) return res.status(400).json({ message: "Not a collaborator" });
 
-    await post.populate("collaborators.user", "username");
-    res.json({ message: "Collaborator removed", post });
-  } catch (error) {
-    res.status(500).json({ error });
-  }
-};
+      collab.role = role;
+      await post.save();
 
-// --------------------- UPDATE COLLABORATOR ROLE ---------------------
-exports.updateCollaboratorRole = async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const { username, role } = req.body;
+      res.json({ message: "Collaborator role updated", post });
+    } catch (error) {
+      res.status(500).json({ error });
+    }
+  };
 
-    const validRoles = ["editor", "commenter"];
-    if (!validRoles.includes(role))
-      return res.status(400).json({ message: "Invalid role" });
+  exports.createDraftPost = async (
+    req,
+    res
+  ) => {
+    try {
+      const post = await Post.create({
+        title: "Untitled",
 
-    const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: "Post not found" });
+        author: req.session.user._id,
 
     if (!canManageCollaborators(post, req.session.user._id.toString()))
       return res.status(403).json({ message: "Not authorized" });
 
-    const user = await User.findOne({ username });
+exports.getCollaborativePost =
+  async (req, res) => {
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    try {
 
-    const collab = post.collaborators.find(
-      (c) => c.user.toString() === user._id.toString(),
-    );
+      const { postId } =
+        req.params;
 
-    if (!collab) return res.status(400).json({ message: "Not a collaborator" });
+      const post =
+        await Post.findById(
+          postId,
+        )
+          .populate(
+            "author",
+            "username email profileImage",
+          )
+          .populate(
+            "collaborators.user",
+            "username email profileImage",
+          );
 
-    collab.role = role;
-    await post.save();
-    await post.populate("collaborators.user", "username");
+      if (!post) {
+        return res.status(404).json({
+          message:
+            "Post not found",
+        });
+      }
+
+      const userId =
+        req.session.user._id.toString();
+
+      const isOwner =
+        post.author._id.toString() ===
+        userId;
+
+      const isCollaborator =
+        post.collaborators.some(
+          (c) =>
+            c.user._id.toString() ===
+            userId,
+        );
+
+      if (
+        !isOwner &&
+        !isCollaborator
+      ) {
+        return res.status(403).json({
+          message:
+            "Unauthorized",
+        });
+      }
+
+      return res.json({
+        post,
+      });
 
     res.json({ message: "Collaborator role updated", post });
   } catch (error) {
@@ -962,8 +1010,7 @@ exports.publishPost = async (req, res) => {
         .json({ message: "Only the post owner can publish this post" });
     }
 
-    post.status = "published";
-    await post.save();
+      console.error(error);
 
     await post.populate("author", "username profileImage");
     await post.populate("collaborators.user", "username profileImage");
@@ -991,8 +1038,9 @@ exports.unpublishPost = async (req, res) => {
         .json({ message: "Only the post owner can unpublish this post" });
     }
 
-    post.status = "draft";
-    await post.save();
+      const post =
+        await Post.create({
+          title: "Untitled",
 
     await post.populate("author", "username profileImage");
     await post.populate("collaborators.user", "username profileImage");
@@ -1007,11 +1055,8 @@ exports.unpublishPost = async (req, res) => {
   }
 };
 
-// --------------------- AUTOSAVE ---------------------
-exports.autoSave = async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const { document } = req.body;
+          document: {
+            schemaVersion: 1,
 
     if (
       !document ||
@@ -1027,7 +1072,7 @@ exports.autoSave = async (req, res) => {
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const userId = req.session.user._id.toString();
+          collaborators: [],
 
     if (!canEditPost(post, userId)) {
       return res
@@ -1035,10 +1080,9 @@ exports.autoSave = async (req, res) => {
         .json({ message: "Not authorized to edit this post" });
     }
 
-    post.document = document;
-    post.lastAutoSavedAt = new Date();
+    } catch (error) {
 
-    await post.save();
+      console.error(error);
 
     return res.json({
       message: "Autosaved",

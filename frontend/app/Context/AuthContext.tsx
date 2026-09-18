@@ -19,11 +19,19 @@ type AuthContextType = {
   refetchUser: () => Promise<User | null>;
 };
 
-const AuthContext = createContext<AuthContextType | null>(null);
+  const [
+    user,
+    setUser,
+  ] = useState<
+    User | null
+  >(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(
+    true,
+  );
 
   const router = useRouter();
 
@@ -38,10 +46,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: "include",
         });
 
-        if (!res.ok) {
-          setUser(null);
-          return;
-        }
+    const fetchMe =
+      async () => {
+
+        try {
+
+          const res =
+            await fetch(
+              "http://localhost:5000/api/auth/me",
+              {
+                credentials:
+                  "include",
+              },
+            );
+
+          if (
+            !res.ok
+          ) {
+            setUser(
+              null,
+            );
+
+            return;
+          }
+
+          const data =
+            await res.json();
 
         const data = await res.json();
 
@@ -59,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     fetchMe();
+
   }, []);
 
   // ============================================

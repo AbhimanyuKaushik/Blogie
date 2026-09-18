@@ -54,33 +54,32 @@ type Notification = {
    PROPS
 ============================================================ */
 
+import {
+  Bell,
+  PenLine,
+} from "lucide-react";
+
+import {
+  useState,
+} from "react";
+
+import {
+  useAuth,
+} from "../Context/AuthContext";
+
+import {
+  useSocket,
+} from "../Context/SocketContext";
+
+import AuthModal from "./AuthModal";
+
 type NavbarProps = {
-  onMenuClick: () => void;
+  onMenuClick:
+    () => void;
 };
 
 /* ============================================================
    API
-============================================================ */
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
-
-/* ============================================================
-   NAVBAR
-============================================================ */
-
-function Navbar({ onMenuClick }: NavbarProps) {
-  const { user, loading, logout } = useAuth();
-
-  const router = useRouter();
-
-  /* ============================================================
-     STATE
-  ============================================================ */
-
-  const [showAuthModal, setShowAuthModal] = useState(false);
-
-  const [showMenu, setShowMenu] = useState(false);
 
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -433,7 +432,9 @@ function Navbar({ onMenuClick }: NavbarProps) {
   ============================================================ */
 
   if (loading) {
-    return <nav className="w-full h-14 border-b bg-white" />;
+    return (
+      <nav className="w-full h-14 border-b bg-white" />
+    );
   }
 
   /* ============================================================
@@ -452,7 +453,6 @@ function Navbar({ onMenuClick }: NavbarProps) {
             type="button"
             onClick={onMenuClick}
             className="p-1 rounded hover:bg-gray-100"
-            aria-label="Toggle sidebar"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -471,9 +471,10 @@ function Navbar({ onMenuClick }: NavbarProps) {
           </button>
         )}
 
-        <span className="text-2xl font-serif font-bold tracking-tight">
+        <span className="text-2xl font-serif font-bold">
           Blogie
         </span>
+
       </div>
 
       {/* ======================================================
@@ -684,10 +685,12 @@ function Navbar({ onMenuClick }: NavbarProps) {
             onClick={() => setShowAuthModal(true)}
             className="bg-green-600 text-white px-4 h-8 rounded text-sm"
           >
-            Login / Signup
+            Login /
+            Signup
           </button>
         ) : (
           <div className="relative">
+
             <img
               src={user.profileImage || "/default-avatar.png"}
               alt="User avatar"
@@ -714,8 +717,10 @@ function Navbar({ onMenuClick }: NavbarProps) {
                 >
                   Logout
                 </button>
+
               </div>
             )}
+
           </div>
         )}
 
@@ -725,6 +730,7 @@ function Navbar({ onMenuClick }: NavbarProps) {
 
         {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       </div>
+
     </nav>
   );
 }
