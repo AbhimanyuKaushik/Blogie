@@ -130,7 +130,7 @@ router.get("/:postId/likes", auth, postController.getPeopleWhoLikedPost);
 */
 
 // Add comment
-router.post("/:postId/comment", auth, postController.addComment);
+router.post("/:postId/comments", auth, postController.addComment);
 
 // Get comments
 router.get("/:postId/comments", postController.getCommentsForPost);
@@ -164,6 +164,8 @@ router.delete(
   auth,
   postController.unlikeComment,
 );
+
+router.get("/:postId/comments/likes", auth, postController.getCommentLikes);
 
 /*
 |--------------------------------------------------------------------------

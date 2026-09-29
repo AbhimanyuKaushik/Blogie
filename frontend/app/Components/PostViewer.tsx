@@ -1,7 +1,6 @@
 "use client";
-
 import { Post, BlockNode, ImageAttrs } from "../Types/PostTypes";
-
+import Comments from "./Comment";
 export function getVideoEmbedUrl(url: string) {
   if (!url) return "";
 
@@ -517,6 +516,12 @@ export default function PostViewer({ post }: PostViewerProps) {
       <div className="post-content">
         {blocks.map((block, index) => renderBlock(block, index))}
       </div>
+
+      {/* ======================================================
+          COMMENTS
+      ====================================================== */}
+
+      <Comments postId={post._id} />
 
       {/* ======================================================
           FOOTER

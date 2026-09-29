@@ -22,7 +22,7 @@ type Notification = {
     profileImage?: string | null;
   };
 
-  type: "invite" | "comment" | "mention";
+  type: "invite" | "like" | "comment" | "mention" | "comment_like" | "reply";
 
   post?: {
     _id: string;
@@ -31,15 +31,10 @@ type Notification = {
 
   relatedInvite?: {
     _id: string;
-
     role: "editor" | "commenter";
-
     status: "pending" | "accepted" | "rejected";
-
     sender?: string;
-
     receiver?: string;
-
     post?: string;
   } | null;
 
@@ -268,8 +263,8 @@ type NavbarProps = {
       const data = await response.json().catch(() => ({}));
 
       /* --------------------------------------------------------
-           ERROR
-        -------------------------------------------------------- */
+         ERROR
+      -------------------------------------------------------- */
 
       if (!response.ok) {
         console.error("[NAVBAR] Accept invitation failed:", {
@@ -286,7 +281,7 @@ type NavbarProps = {
 
       /* --------------------------------------------------------
            USE POST ID FROM BACKEND
-        -------------------------------------------------------- */
+      -------------------------------------------------------- */
 
       const acceptedPostId = data?.post?._id || data?.postId || postId;
 
@@ -298,7 +293,7 @@ type NavbarProps = {
 
       /* --------------------------------------------------------
            UPDATE NOTIFICATION LOCALLY
-        -------------------------------------------------------- */
+      -------------------------------------------------------- */
 
       setNotifications((previous) =>
         previous.map((notification) =>
@@ -319,13 +314,13 @@ type NavbarProps = {
 
       /* --------------------------------------------------------
            CLOSE DROPDOWN
-        -------------------------------------------------------- */
+      -------------------------------------------------------- */
 
       setShowNotifications(false);
 
       /* --------------------------------------------------------
            OPEN SAME POST
-        -------------------------------------------------------- */
+      -------------------------------------------------------- */
 
       console.log("[NAVBAR] Opening collaborative post:", acceptedPostId);
 
@@ -388,7 +383,7 @@ type NavbarProps = {
 
       /* --------------------------------------------------------
            UPDATE NOTIFICATION LOCALLY
-        -------------------------------------------------------- */
+      -------------------------------------------------------- */
 
       setNotifications((previous) =>
         previous.map((notification) =>
@@ -416,6 +411,35 @@ type NavbarProps = {
       );
     } finally {
       setProcessingInviteId(null);
+    }
+  };
+
+  /* ============================================================
+     NOTIFICATION ICON
+  ============================================================ */
+
+  const getNotificationLabel = (notification: Notification) => {
+    switch (notification.type) {
+      case "like":
+        return "liked your post";
+
+      case "comment":
+        return "commented on your post";
+
+      case "reply":
+        return "replied to your comment";
+
+      case "comment_like":
+        return "liked your comment";
+
+      case "mention":
+        return "mentioned you";
+
+      case "invite":
+        return notification.message;
+
+      default:
+        return notification.message;
     }
   };
 
@@ -463,9 +487,7 @@ type NavbarProps = {
               className="w-5 h-5"
             >
               <line x1="3" y1="6" x2="21" y2="6" />
-
               <line x1="3" y1="12" x2="21" y2="12" />
-
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
@@ -559,15 +581,16 @@ type NavbarProps = {
                   </div>
                 ) : (
                   notifications.map((notification) => {
-                    /*
-                     * IMPORTANT:
-                     *
-                     * The notification now contains
-                     * the exact invite.
-                     */
                     const invite = notification.relatedInvite;
 
                     const isProcessing = processingInviteId === invite?._id;
+
+                    const senderName =
+                      notification.sender?.username || "Someone";
+
+                    const senderImage =
+                      notification.sender?.profileImage ||
+                      "/default-avatar.png";
 
                     return (
                       <div
@@ -585,24 +608,49 @@ type NavbarProps = {
                             )}
                           </div>
 
-                          <div className="flex-1">
-                            {/* MESSAGE */}
+                          {/* NOTIFICATION CONTENT */}
 
-                            <p className="text-sm text-gray-700 leading-5">
-                              {notification.message}
-                            </p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-3">
+                              {/* SENDER AVATAR */}
 
-                            {/* DATE */}
+                              <img
+                                src={senderImage}
+                                alt={senderName}
+                                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                              />
 
-                            <p className="mt-1 text-xs text-gray-400">
-                              {new Date(
-                                notification.createdAt,
-                              ).toLocaleString()}
-                            </p>
+                              {/* MESSAGE */}
+
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm text-gray-700 leading-5">
+                                  <strong className="font-semibold text-gray-900">
+                                    {senderName}
+                                  </strong>{" "}
+                                  {getNotificationLabel(notification)}
+                                </p>
+
+                                {/* POST TITLE */}
+
+                                {notification.post?.title && (
+                                  <p className="mt-1 text-xs text-gray-500 truncate">
+                                    "{notification.post.title}"
+                                  </p>
+                                )}
+
+                                {/* DATE */}
+
+                                <p className="mt-1 text-xs text-gray-400">
+                                  {new Date(
+                                    notification.createdAt,
+                                  ).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
 
                             {/* =================================================
-                                    COLLABORATION INVITATION
-                                ================================================= */}
+                                COLLABORATION INVITATION
+                            ================================================= */}
 
                             {notification.type === "invite" && (
                               <>
@@ -650,8 +698,8 @@ type NavbarProps = {
                             )}
 
                             {/* =================================================
-                                    MARK AS READ
-                                ================================================= */}
+                                MARK AS READ
+                            ================================================= */}
 
                             {!notification.read && (
                               <button

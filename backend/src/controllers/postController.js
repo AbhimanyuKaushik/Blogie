@@ -273,31 +273,77 @@ exports.deletePost = async (req, res) => {
 };
 
 // --------------------- LIKE POST ---------------------
+// --------------------- LIKE POST ---------------------
 exports.likePost = async (req, res) => {
   try {
     const { postId } = req.params;
-    const userId = req.session.user._id;
+    const userId = req.session?.user?._id;
 
-    const like = await Like.create({ user: userId, post: postId });
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required.",
+      });
+    }
 
-    const post = await Post.findByIdAndUpdate(
+    // 1. Find the post first
+    const post = await Post.findById(postId).select("author title likesCount");
+
+    if (!post) {
+      return res.status(404).json({
+        message: "Post not found.",
+      });
+    }
+
+    // 2. Create the like
+    try {
+      await Like.create({
+        user: userId,
+        post: postId,
+      });
+    } catch (err) {
+      // Duplicate like
+      if (err.code === 11000) {
+        return res.status(200).json({
+          liked: true,
+          likesCount: post.likesCount || 0,
+        });
+      }
+
+      throw err;
+    }
+
+    // 3. Increment like count
+    const updatedPost = await Post.findByIdAndUpdate(
       postId,
       { $inc: { likesCount: 1 } },
       { new: true },
-    ).select("likesCount");
+    ).select("author title likesCount");
 
-    res.json({ liked: true, likesCount: post.likesCount });
-  } catch (err) {
-    if (err.code === 11000) {
-      // Already liked → still return current count (nice for frontend)
-      const post = await Post.findById(postId).select("likesCount");
-      return res
-        .status(200)
-        .json({ liked: true, likesCount: post?.likesCount || 0 });
+    // 4. Create notification
+    // Don't notify the user when they like their own post.
+    if (updatedPost.author.toString() !== userId.toString()) {
+      await Notification.create({
+        receiver: updatedPost.author,
+        sender: userId,
+        type: "like",
+        post: updatedPost._id,
+        message: "liked your post",
+        read: false,
+      });
     }
 
-    console.error(err);
-    res.status(500).json({ message: "Error liking post" });
+    // 5. Response
+    return res.status(200).json({
+      liked: true,
+      likesCount: updatedPost.likesCount,
+    });
+  } catch (error) {
+    console.error("LIKE POST ERROR:", error);
+
+    return res.status(500).json({
+      message: "Error liking post.",
+      error: error.message,
+    });
   }
 };
 
@@ -367,21 +413,71 @@ exports.getPeopleWhoLikedPost = async (req, res) => {
   }
 };
 
-// --------------------- ADD COMMENT ---------------------
+// --------------------- ADD COMMENT / REPLY ---------------------
 exports.addComment = async (req, res) => {
   try {
     const { postId } = req.params;
-    const userId = req.session.user._id;
+    const userId = req.session?.user?._id;
     const { content, parentId } = req.body;
 
-    if (!content || !content.trim())
-      return res.status(400).json({ message: "Content is required" });
+    // --------------------------------------------------
+    // 1. AUTHENTICATION
+    // --------------------------------------------------
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 2. VALIDATE CONTENT
+    // --------------------------------------------------
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({
+        message: "Content is required.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 3. FIND POST
+    // --------------------------------------------------
 
     const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (parentId && !mongoose.Types.ObjectId.isValid(parentId))
-      return res.status(400).json({ message: "Invalid parentId" });
+    if (!post) {
+      return res.status(404).json({
+        message: "Post not found.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 4. VALIDATE PARENT COMMENT
+    // --------------------------------------------------
+
+    if (parentId) {
+      if (!mongoose.Types.ObjectId.isValid(parentId)) {
+        return res.status(400).json({
+          message: "Invalid parentId.",
+        });
+      }
+
+      const parentComment = await Comment.findOne({
+        _id: parentId,
+        postId,
+      });
+
+      if (!parentComment) {
+        return res.status(404).json({
+          message: "Parent comment not found.",
+        });
+      }
+    }
+
+    // --------------------------------------------------
+    // 5. CREATE COMMENT / REPLY
+    // --------------------------------------------------
 
     const newComment = await Comment.create({
       postId,
@@ -390,15 +486,53 @@ exports.addComment = async (req, res) => {
       parentId: parentId || null,
     });
 
-    await Post.findByIdAndUpdate(postId, { $inc: { commentCount: 1 } });
+    // --------------------------------------------------
+    // 6. UPDATE POST COMMENT COUNT
+    // --------------------------------------------------
+
+    await Post.findByIdAndUpdate(postId, {
+      $inc: {
+        commentCount: 1,
+      },
+    });
+
+    // Notify post owner
+    if (post.author.toString() !== userId.toString()) {
+      await Notification.create({
+        receiver: post.author,
+        sender: userId,
+        type: "comment",
+        post: post._id,
+        message: parentId
+          ? "replied to a comment on your post"
+          : "commented on your post",
+        read: false,
+      });
+    }
+
+    // --------------------------------------------------
+    // 7. POPULATE USER
+    // --------------------------------------------------
 
     await newComment.populate("userId", "username profileImage");
 
-    res.status(201).json({ message: "Comment added", comment: newComment });
+    // --------------------------------------------------
+    // 8. RESPONSE
+    // --------------------------------------------------
+
+    return res.status(201).json({
+      message: parentId
+        ? "Reply added successfully."
+        : "Comment added successfully.",
+      comment: newComment,
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error adding comment", error: error.message });
+    console.error("ADD COMMENT ERROR:", error);
+
+    return res.status(500).json({
+      message: "Error adding comment.",
+      error: error.message,
+    });
   }
 };
 
@@ -406,23 +540,25 @@ exports.addComment = async (req, res) => {
 exports.getCommentsForPost = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { limit = 10, skip = 0, parentId } = req.query;
 
-    const query = { postId };
-    if (parentId) query.parentId = parentId;
-
-    const comments = await Comment.find(query)
+    const comments = await Comment.find({
+      postId,
+    })
       .populate("userId", "username profileImage")
-      .populate("parentId", "content")
-      .sort({ createdAt: -1 })
-      .skip(parseInt(skip))
-      .limit(parseInt(limit));
+      .sort({ createdAt: 1 })
+      .lean();
 
-    const total = await Comment.countDocuments(query);
-
-    res.status(200).json({ comments, total });
+    return res.status(200).json({
+      comments,
+      total: comments.length,
+    });
   } catch (error) {
-    res.status(500).json({ error });
+    console.error("GET COMMENTS ERROR:", error);
+
+    return res.status(500).json({
+      message: "Error fetching comments.",
+      error: error.message,
+    });
   }
 };
 
@@ -430,20 +566,100 @@ exports.getCommentsForPost = async (req, res) => {
 exports.deleteComment = async (req, res) => {
   try {
     const { postId, commentId } = req.params;
-    const userId = req.session.user._id;
+    const userId = req.session?.user?._id;
 
-    const comment = await Comment.findOne({ _id: commentId, postId });
-    if (!comment) return res.status(404).json({ message: "Comment not found" });
+    // --------------------------------------------------
+    // 1. CHECK AUTHENTICATION
+    // --------------------------------------------------
 
-    if (comment.userId.toString() !== userId.toString())
-      return res.status(403).json({ message: "Not authorized" });
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 2. FIND POST
+    // --------------------------------------------------
+
+    const post = await Post.findById(postId).select("author");
+
+    if (!post) {
+      return res.status(404).json({
+        message: "Post not found.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 3. FIND COMMENT
+    // --------------------------------------------------
+
+    const comment = await Comment.findOne({
+      _id: commentId,
+      postId,
+    });
+
+    if (!comment) {
+      return res.status(404).json({
+        message: "Comment not found.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 4. CHECK PERMISSION
+    //
+    // User can delete if:
+    //
+    // A. They created the comment
+    // OR
+    // B. They created the post
+    // --------------------------------------------------
+
+    const currentUserId = userId.toString();
+    const commentAuthorId = comment.userId.toString();
+    const postAuthorId = post.author.toString();
+
+    const isCommentAuthor = commentAuthorId === currentUserId;
+
+    const isPostAuthor = postAuthorId === currentUserId;
+
+    if (!isCommentAuthor && !isPostAuthor) {
+      return res.status(403).json({
+        message:
+          "You can only delete your own comments or comments on your post.",
+      });
+    }
+
+    // --------------------------------------------------
+    // 5. DELETE COMMENT
+    // --------------------------------------------------
 
     await Comment.findByIdAndDelete(commentId);
-    await Post.findByIdAndUpdate(postId, { $inc: { commentCount: -1 } });
 
-    res.json({ message: "Comment deleted" });
+    // --------------------------------------------------
+    // 6. DECREMENT COMMENT COUNT
+    // --------------------------------------------------
+
+    await Post.findByIdAndUpdate(postId, {
+      $inc: {
+        commentCount: -1,
+      },
+    });
+
+    // --------------------------------------------------
+    // 7. RESPONSE
+    // --------------------------------------------------
+
+    return res.status(200).json({
+      message: "Comment deleted successfully.",
+    });
   } catch (error) {
-    res.status(500).json({ error });
+    console.error("DELETE COMMENT ERROR:", error);
+
+    return res.status(500).json({
+      message: "Error deleting comment.",
+      error: error.message,
+    });
   }
 };
 
@@ -518,6 +734,44 @@ exports.unlikeComment = async (req, res) => {
     res.json({ message: "Comment unliked", likesCount: updated.likesCount });
   } catch (error) {
     res.status(500).json({ error });
+  }
+};
+
+// --------------------- GET COMMENT LIKES ---------------------
+exports.getCommentLikes = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const userId = req.session?.user?._id;
+
+    if (!userId) {
+      return res.status(200).json({
+        likedCommentIds: [],
+      });
+    }
+
+    const comments = await Comment.find({
+      postId,
+    }).select("_id");
+
+    const commentIds = comments.map((comment) => comment._id);
+
+    const likes = await CommentLike.find({
+      user: userId,
+      comment: {
+        $in: commentIds,
+      },
+    }).select("comment");
+
+    return res.status(200).json({
+      likedCommentIds: likes.map((like) => like.comment.toString()),
+    });
+  } catch (error) {
+    console.error("GET COMMENT LIKES ERROR:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch comment likes.",
+      error: error.message,
+    });
   }
 };
 
