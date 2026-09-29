@@ -19,8 +19,13 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
   });
 
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const { refetchUser } = useAuth();
+
+  // ============================================================
+  // INPUT CHANGE
+  // ============================================================
 
   const onChangeHandler = (e: React.ChangeEvent<HTMLInputElement>) => {
     setData({
@@ -29,23 +34,27 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     });
   };
 
-  // ============================================
+  // ============================================================
   // GOOGLE OAUTH
-  // ============================================
+  // ============================================================
+
   const handleGoogleLogin = () => {
     setError("");
 
-    // Redirect browser to Express OAuth endpoint.
-    // Express will redirect the user to Google.
     window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
-  // ============================================
+  // ============================================================
   // NORMAL LOGIN / SIGNUP
-  // ============================================
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ============================================================
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (loading) return;
+
     setError("");
+    setLoading(true);
 
     const isLogin = currState === "Login";
 
@@ -65,6 +74,10 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         };
 
     try {
+      // ========================================================
+      // AUTH REQUEST
+      // ========================================================
+
       const res = await fetch(url, {
         method: "POST",
         headers: {
@@ -77,37 +90,69 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
       const result = await res.json();
 
       if (!res.ok) {
-        setError(result.message || "Something went wrong");
+        setError(result.message || "Something went wrong.");
         return;
       }
 
-      // Refresh AuthContext with the newly created session.
-      await refetchUser();
+      // ========================================================
+      // REFRESH AUTH CONTEXT
+      // ========================================================
+      //
+      // IMPORTANT:
+      //
+      // Do NOT use:
+      //
+      // result.user.isOnboarded
+      //
+      // because the login endpoint may not return `user`.
+      //
+      // refetchUser() calls /api/auth/me and returns the
+      // authenticated user from the current session.
+      //
+      // ========================================================
+
+      const authenticatedUser = await refetchUser();
+
+      if (!authenticatedUser) {
+        setError("Authentication succeeded, but the user could not be loaded.");
+        return;
+      }
+
+      // ========================================================
+      // CLOSE MODAL
+      // ========================================================
 
       onClose();
 
-      // Existing onboarding logic.
-      if (isLogin && result.user.isOnboarded) {
-        router.push("/");
+      // ========================================================
+      // ONBOARDING REDIRECT
+      // ========================================================
+
+      if (authenticatedUser.isOnboarded) {
+        router.replace("/");
       } else {
-        router.push("/Onboarding");
+        router.replace("/Onboarding");
       }
     } catch (error) {
       console.error("AUTH ERROR:", error);
+
       setError("Server error. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="login-popup fixed inset-0 z-50 bg-[#00000090] grid">
+    <div className="login-popup fixed inset-0 z-50 grid bg-[#00000090]">
       <form
         onSubmit={handleSubmit}
-        className="login-popup-container place-self-center bg-white p-6 rounded-lg flex flex-col gap-4 w-[350px]"
+        className="login-popup-container place-self-center flex w-87.5 flex-col gap-4 rounded-lg bg-white p-6"
       >
-        {/* ============================================
+        {/* ==================================================
             HEADER
-        ============================================ */}
-        <div className="flex justify-between items-center text-xl font-bold">
+        ================================================== */}
+
+        <div className="flex items-center justify-between text-xl font-bold">
           <h2>{currState}</h2>
 
           <Image
@@ -120,105 +165,126 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           />
         </div>
 
-        {/* ============================================
+        {/* ==================================================
             GOOGLE LOGIN
-        ============================================ */}
+        ================================================== */}
+
         <button
           type="button"
           onClick={handleGoogleLogin}
-          className="w-full border border-gray-300 rounded-lg py-2.5 flex items-center justify-center gap-3 hover:bg-gray-50 transition-colors"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 py-2.5 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {/* Google logo */}
+
           <span className="text-lg font-bold">G</span>
 
           <span className="text-sm font-medium">Continue with Google</span>
         </button>
 
-        {/* ============================================
+        {/* ==================================================
             DIVIDER
-        ============================================ */}
+        ================================================== */}
+
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-gray-200" />
+          <div className="h-px flex-1 bg-gray-200" />
 
           <span className="text-xs text-gray-500">OR</span>
 
-          <div className="flex-1 h-px bg-gray-200" />
+          <div className="h-px flex-1 bg-gray-200" />
         </div>
 
-        {/* ============================================
+        {/* ==================================================
             SIGNUP NAME
-        ============================================ */}
+        ================================================== */}
+
         {currState === "Sign Up" && (
           <input
-            className="border p-2 rounded"
+            className="rounded border p-2"
             name="name"
             value={data.name}
             onChange={onChangeHandler}
             type="text"
             placeholder="Your Name"
+            disabled={loading}
             required
           />
         )}
 
-        {/* ============================================
+        {/* ==================================================
             EMAIL
-        ============================================ */}
+        ================================================== */}
+
         <input
-          className="border p-2 rounded"
+          className="rounded border p-2"
           name="email"
           value={data.email}
           onChange={onChangeHandler}
           type="email"
           placeholder="Your email"
+          disabled={loading}
           required
         />
 
-        {/* ============================================
+        {/* ==================================================
             PASSWORD
-        ============================================ */}
+        ================================================== */}
+
         <input
-          className="border p-2 rounded"
+          className="rounded border p-2"
           name="password"
           value={data.password}
           onChange={onChangeHandler}
           type="password"
           placeholder="Your password"
+          disabled={loading}
           required
         />
 
-        {/* ============================================
+        {/* ==================================================
             ERROR
-        ============================================ */}
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+        ================================================== */}
 
-        {/* ============================================
-            NORMAL LOGIN / SIGNUP BUTTON
-        ============================================ */}
+        {error && <p className="text-sm text-red-500">{error}</p>}
+
+        {/* ==================================================
+            LOGIN / SIGNUP BUTTON
+        ================================================== */}
+
         <button
           type="submit"
-          className="p-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
+          disabled={loading}
+          className="rounded bg-green-600 p-2 text-sm text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
         >
-          {currState === "Sign Up" ? "Create account" : "Login"}
+          {loading
+            ? "Please wait..."
+            : currState === "Sign Up"
+              ? "Create account"
+              : "Login"}
         </button>
 
-        {/* ============================================
+        {/* ==================================================
             TERMS
-        ============================================ */}
+        ================================================== */}
+
         <div className="flex items-start gap-2 text-sm">
-          <input type="checkbox" required />
+          <input type="checkbox" disabled={loading} required />
 
           <p>By continuing, I agree to the terms of use & privacy policy.</p>
         </div>
 
-        {/* ============================================
+        {/* ==================================================
             SWITCH LOGIN / SIGNUP
-        ============================================ */}
+        ================================================== */}
+
         {currState === "Login" ? (
           <p className="text-sm">
             Create a new account?{" "}
             <span
-              className="text-green-600 cursor-pointer hover:underline"
+              className="cursor-pointer text-green-600 hover:underline"
               onClick={() => {
+                if (loading) return;
+
                 setCurrState("Sign Up");
                 setError("");
               }}
@@ -230,8 +296,10 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           <p className="text-sm">
             Already have an account?{" "}
             <span
-              className="text-green-600 cursor-pointer hover:underline"
+              className="cursor-pointer text-green-600 hover:underline"
               onClick={() => {
+                if (loading) return;
+
                 setCurrState("Login");
                 setError("");
               }}

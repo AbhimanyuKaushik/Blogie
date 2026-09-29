@@ -5,4 +5,5 @@ export type User = {
   profileImage?: string;
   role?: "user" | "admin";
   interests?: string[];
+  isOnboarded?: boolean;
 };

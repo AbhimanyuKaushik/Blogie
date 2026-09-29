@@ -1,5 +1,6 @@
-const dns = require("node:dns");
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
+// const dns = require("node:dns");
+
+// dns.setServers(["8.8.8.8"]);
 
 require("dotenv").config();
 
@@ -65,12 +66,15 @@ app.use("/api/auth", authRoutes);
 // ──────────────────────────────────────────────────────────────
 
 mongoose
-  .connect(process.env.MONGO_URL)
+  .connect(process.env.MONGO_URL, {
+    serverSelectionTimeoutMS: 30000,
+    connectTimeoutMS: 30000,
+  })
   .then(() => {
-    console.log("Connected to MongoDB");
+    console.log("✅ Connected to MongoDB");
   })
   .catch((err) => {
-    console.error("MongoDB connection error:", err);
+    console.error("❌ MongoDB connection error:", err);
   });
 
 // ──────────────────────────────────────────────────────────────
