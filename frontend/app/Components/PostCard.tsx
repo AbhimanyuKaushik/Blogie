@@ -146,7 +146,6 @@ export default function PostCard({
         <span className="font-medium text-black">
           {post.author?.username ?? "Unknown"}
         </span>
-        <span>Â·</span>
         <span>{new Date(post.createdAt).toLocaleDateString()}</span>
       </div>
 

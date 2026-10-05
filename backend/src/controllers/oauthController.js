@@ -174,7 +174,7 @@ exports.googleCallback = async (req, res) => {
       // ============================================
 
       if (user.isOnboarded) {
-        return res.redirect("http://localhost:3000/feed");
+        return res.redirect("http://localhost:3000/");
       }
 
       return res.redirect("http://localhost:3000/Onboarding");
