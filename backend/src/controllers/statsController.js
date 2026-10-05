@@ -15,7 +15,7 @@ exports.getCreatorStats = async (req, res) => {
     // published field if your Post model uses another name.
     const posts = await Post.find({
       author: userId,
-      isPublished: true,
+      status: "published",
     })
       .select("_id title views likesCount commentCount createdAt updatedAt")
       .sort({ createdAt: -1 })
