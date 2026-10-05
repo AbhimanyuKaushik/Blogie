@@ -10,7 +10,7 @@ const notificationSchema = new mongoose.Schema({
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    rewuired: true,
+    required: true,
   },
 
   type: {

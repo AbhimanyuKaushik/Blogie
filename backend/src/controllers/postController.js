@@ -101,7 +101,7 @@ exports.getAllPosts = async (req, res) => {
     const userId = req.session.user?._id;
     console.log("SESSION USER IN GET ALL:", req.session.user);
     // Get posts as plain JS objects (important!)
-    const posts = await Post.find()
+    const posts = await Post.find({ status: "published" })
       .sort({ createdAt: -1 })
       .populate("author", "username profileImage")
       .lean();
