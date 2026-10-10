@@ -13,6 +13,8 @@ import {
 import { useLiveblocksExtension } from "@liveblocks/react-tiptap";
 
 import { EditorContent, useEditor } from "@tiptap/react";
+import { Node, mergeAttributes } from "@tiptap/core";
+import Image from "@tiptap/extension-image";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
@@ -43,6 +45,7 @@ import {
   Heading2,
   Heading3,
   Highlighter,
+  Image as ImageIcon,
   Italic,
   Link as LinkIcon,
   List,
@@ -59,6 +62,7 @@ import {
   Underline as UnderlineIcon,
   Undo2,
   Unlink,
+  Video as VideoIcon,
 } from "lucide-react";
 
 /* ============================================================
@@ -157,6 +161,60 @@ type ApiResult<T = any> = {
 /* ============================================================
    DEFAULT DOCUMENT
 ============================================================ */
+
+/**
+ * Custom video node. The video binary is intentionally NOT stored in the
+ * Tiptap/Liveblocks document. Only the media URL and display attributes are
+ * synchronized. The actual file should live in object storage.
+ */
+const Video = Node.create({
+  name: "video",
+
+  group: "block",
+
+  atom: true,
+
+  selectable: true,
+
+  draggable: true,
+
+  isolating: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: null,
+      },
+      controls: {
+        default: true,
+      },
+      loop: {
+        default: false,
+      },
+      muted: {
+        default: false,
+      },
+      poster: {
+        default: null,
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: "video" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "video",
+      mergeAttributes(HTMLAttributes, {
+        controls: true,
+        preload: "metadata",
+        class: "blogie-video",
+      }),
+    ];
+  },
+});
 
 const EMPTY_DOCUMENT: EditorDocument = {
   type: "doc",
@@ -690,6 +748,17 @@ const Tiptap = ({
 
       Superscript,
 
+      // Media
+      Image.configure({
+        inline: false,
+        allowBase64: false,
+        HTMLAttributes: {
+          class: "blogie-image",
+        },
+      }),
+
+      Video,
+
       // Links
       Link.configure({
         openOnClick: false,
@@ -1187,6 +1256,50 @@ const Tiptap = ({
   };
 
   /* ==========================================================
+     MEDIA
+  ========================================================== */
+
+  const addImage = () => {
+    if (!editor || !canEdit) return;
+
+    const url = window.prompt("Enter image URL");
+
+    if (!url?.trim()) return;
+
+    const alt =
+      window.prompt("Enter image alt text (optional)") || "Blogie image";
+
+    editor
+      .chain()
+      .focus()
+      .setImage({
+        src: url.trim(),
+        alt: alt.trim() || "Blogie image",
+      })
+      .run();
+  };
+
+  const addVideo = () => {
+    if (!editor || !canEdit) return;
+
+    const url = window.prompt("Enter video URL");
+
+    if (!url?.trim()) return;
+
+    editor
+      .chain()
+      .focus()
+      .insertContent({
+        type: "video",
+        attrs: {
+          src: url.trim(),
+          controls: true,
+        },
+      })
+      .run();
+  };
+
+  /* ==========================================================
      LINK
   ========================================================== */
 
@@ -1462,7 +1575,6 @@ const Tiptap = ({
           <div className="flex-1 min-w-0">
             {liveblocksExtension && effectivePostId ? (
               <CollaborativeTitleRoom
-                postId={effectivePostId}
                 initialTitle={title}
                 canEdit={canEdit}
                 onChange={persistCollaborativeTitle}
@@ -1904,6 +2016,20 @@ const Tiptap = ({
 
           <ToolbarDivider />
 
+          {/* IMAGE */}
+
+          <ToolbarButton onClick={addImage} label="Add image">
+            <ImageIcon size={17} />
+          </ToolbarButton>
+
+          {/* VIDEO */}
+
+          <ToolbarButton onClick={addVideo} label="Add video">
+            <VideoIcon size={17} />
+          </ToolbarButton>
+
+          <ToolbarDivider />
+
           {/* ALIGN LEFT */}
 
           <ToolbarButton
@@ -2117,45 +2243,50 @@ const Tiptap = ({
           >
             <button
               type="button"
+              disabled={!canEdit}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => editor.chain().focus().toggleBold().run()}
-              className="p-2 rounded hover:bg-white/10"
+              className="p-2 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <Bold size={15} />
             </button>
 
             <button
               type="button"
+              disabled={!canEdit}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => editor.chain().focus().toggleItalic().run()}
-              className="p-2 rounded hover:bg-white/10"
+              className="p-2 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <Italic size={15} />
             </button>
 
             <button
               type="button"
+              disabled={!canEdit}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => editor.chain().focus().toggleUnderline().run()}
-              className="p-2 rounded hover:bg-white/10"
+              className="p-2 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <UnderlineIcon size={15} />
             </button>
 
             <button
               type="button"
+              disabled={!canEdit}
               onMouseDown={(event) => event.preventDefault()}
               onClick={setLink}
-              className="p-2 rounded hover:bg-white/10"
+              className="p-2 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <LinkIcon size={15} />
             </button>
 
             <button
               type="button"
+              disabled={!canEdit}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setHighlight("#fef08a")}
-              className="p-2 rounded hover:bg-white/10"
+              className="p-2 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <Highlighter size={15} />
             </button>
@@ -2394,6 +2525,24 @@ const Tiptap = ({
       )}
 
       <style jsx global>{`
+        .ProseMirror .blogie-image {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          margin: 1.5rem auto;
+          border-radius: 0.75rem;
+        }
+
+        .ProseMirror .blogie-video {
+          display: block;
+          width: 100%;
+          max-width: 100%;
+          height: auto;
+          margin: 1.5rem auto;
+          border-radius: 0.75rem;
+          background: #000;
+        }
+
         .collaboration-title-editor .ProseMirror {
           min-height: 1.25em;
           white-space: pre-wrap;

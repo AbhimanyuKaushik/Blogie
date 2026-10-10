@@ -1398,3 +1398,68 @@ exports.updatePostTitle = async (req, res) => {
     });
   }
 };
+
+exports.collaborationHeartbeat = async (req, res) => {
+  try {
+    const userId = req.session?.user?._id;
+    const { postId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID.",
+      });
+    }
+
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found.",
+      });
+    }
+
+    const ownerId = post.author?.toString();
+
+    if (ownerId !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the post owner can maintain collaboration.",
+      });
+    }
+
+    const sessionId =
+      post.activeCollaborationSession?.sessionId || crypto.randomUUID();
+
+    const expiresAt = new Date(Date.now() + 30_000);
+
+    post.activeCollaborationSession = {
+      sessionId,
+      ownerId: userId,
+      expiresAt,
+    };
+
+    await post.save();
+
+    return res.status(200).json({
+      success: true,
+      sessionId,
+      expiresAt,
+    });
+  } catch (error) {
+    console.error("[COLLABORATION HEARTBEAT ERROR]", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to maintain collaboration session.",
+    });
+  }
+};

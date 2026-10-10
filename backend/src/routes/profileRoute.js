@@ -4,7 +4,7 @@ const User = require("../models/User");
 const userController = require("../controllers/userController");
 const router = express.Router();
 const upload = require("../middleware/multer");
-const cloudinary = require("../config/cloudinary");
+const mongoose = require("mongoose");
 
 // Get current user's profile
 router.get("/me", auth, async (req, res) => {
@@ -24,20 +24,44 @@ router.get("/me", auth, async (req, res) => {
 });
 
 // Get any user's public profile
-router.get("/:userId", async (req, res) => {
+router.get("/:userId", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId).select(
-      "username profileImage bio age location social interests followers following"
+    const targetUserId = req.params.userId;
+    const currentUserId = req.session.user._id;
+
+    // Validate target user ID
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({
+        message: "Invalid user ID",
+      });
+    }
+
+    const user = await User.findById(targetUserId).select(
+      "username profileImage bio age location social interests followers following",
     );
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
-    res.json({ message: "Profile retrieved", profile: user });
+    // Check whether the logged-in user already follows this profile
+    const isFollowing = user.followers.some(
+      (followerId) => followerId.toString() === currentUserId.toString(),
+    );
+
+    return res.status(200).json({
+      message: "Profile retrieved",
+      profile: user,
+      isFollowing,
+    });
   } catch (err) {
-    console.error("Profile error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Public profile error:", err);
+
+    return res.status(500).json({
+      error: err.message,
+    });
   }
 });
 
@@ -71,24 +95,29 @@ router.patch("/me", auth, async (req, res) => {
   }
 });
 
-router.patch("/upload-profile-image", auth, upload.single("image"),async(req,res)=>{
-  try{
-    const userId = req.session.user._id;
-    const user = await User.findById(userId);
-    if(!user){
-      return res.status(404).json({message:"User not found"});
+router.patch(
+  "/upload-profile-image",
+  auth,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const userId = req.session.user._id;
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      user.profileImage = req.file.path;
+      await user.save();
+      res.json({
+        message: "Profile Updated!",
+        profileImage: user.profileImage,
+      });
+    } catch (err) {
+      console.error("Upload error:", err);
+      res.status(500).json({ error: err.message });
     }
-    user.profileImage=req.file.path;
-    await user.save();
-    res.json({
-      message:"Profile Updated!",
-      profileImage:user.profileImage,
-    });
-  } catch(err){
-    console.error("Upload error:",err);
-    res.status(500).json({error:err.message});
-  }
-})
+  },
+);
 
 // Onboarding Completion
 router.patch("/onboarding", auth, userController.completeOnboarding);

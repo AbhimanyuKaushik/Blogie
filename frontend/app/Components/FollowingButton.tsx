@@ -23,7 +23,7 @@ export default function FollowButton({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Don't show follow button for yourself
+  // Don't show the button when viewing your own profile
   if (!user || user.id === targetUserId) {
     return null;
   }
@@ -87,7 +87,7 @@ export default function FollowButton({
             : "bg-black text-white hover:bg-gray-800"
         } disabled:cursor-not-allowed disabled:opacity-50`}
       >
-        {loading ? "..." : isFollowing ? "Following" : "Follow"}
+        {loading ? "..." : isFollowing ? "Unfollow" : "Follow"}
       </button>
 
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}

@@ -17,6 +17,6 @@ router.get("/me/saved", auth, userController.savedPosts);
 router.post("/:id/follow", auth, userController.followUser);
 
 // Unfollow User
-router.post("/:id/unfollow", auth, userController.unfollowUser);
+router.delete("/:id/follow", auth, userController.unfollowUser);
 
 module.exports = router;

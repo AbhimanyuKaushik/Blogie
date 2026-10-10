@@ -92,6 +92,21 @@ const postSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  activeCollaborationSession: {
+    sessionId: {
+      type: String,
+      default: null,
+    },
+    ownerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    expiresAt: {
+      type: Date,
+      default: null,
+    },
+  },
 });
 
 postSchema.pre("save", function (next) {

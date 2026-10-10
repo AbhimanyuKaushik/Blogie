@@ -176,4 +176,10 @@ router.post("/:postId/save", auth, postController.savePost);
 // Unsave post
 router.delete("/:postId/save", auth, postController.unsavePost);
 
+router.post(
+  "/:postId/collaboration/heartbeat",
+  auth,
+  postController.collaborationHeartbeat,
+);
+
 module.exports = router;
