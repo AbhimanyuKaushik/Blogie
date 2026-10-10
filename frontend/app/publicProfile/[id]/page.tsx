@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Calendar,
-  Edit3,
   FileText,
   Instagram,
   Linkedin,
@@ -15,7 +14,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import FollowButton from "../../Components/FollwoingButton";
+import FollowButton from "../../Components/FollowingButton";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
@@ -55,6 +54,7 @@ export default function PublicProfilePage() {
         setLoading(true);
 
         const response = await fetch(`${API_BASE_URL}/profile/${userId}`, {
+          method: "GET",
           credentials: "include",
           headers: {
             Accept: "application/json",
@@ -70,6 +70,8 @@ export default function PublicProfilePage() {
 
         setProfile(data.profile);
 
+        // IMPORTANT:
+        // Backend must return isFollowing
         setIsFollowing(Boolean(data.isFollowing));
       } catch (error) {
         console.error("Failed to load public profile:", error);
@@ -164,7 +166,7 @@ export default function PublicProfilePage() {
                 </h1>
               </div>
 
-              {/* FOLLOW */}
+              {/* FOLLOW / UNFOLLOW */}
 
               <FollowButton
                 targetUserId={profile._id}

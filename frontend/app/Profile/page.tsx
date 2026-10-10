@@ -158,7 +158,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 aria-label="Change profile picture"
-                onClick={() => router.push("/profile/edit")}
+                onClick={() => router.push("/publicProfile/edit")}
                 className="
                   absolute
                   bottom-3

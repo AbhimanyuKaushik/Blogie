@@ -21,6 +21,7 @@
     "@tiptap/extension-character-count": "^3.30.2",
     "@tiptap/extension-color": "^3.30.2",
     "@tiptap/extension-highlight": "^3.30.2",
+    "@tiptap/extension-image": "^3.30.2",
     "@tiptap/extension-link": "^3.30.2",
     "@tiptap/extension-placeholder": "^3.30.2",
     "@tiptap/extension-subscript": "^3.30.2",

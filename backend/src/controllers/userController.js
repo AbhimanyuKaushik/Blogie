@@ -149,84 +149,154 @@ exports.searchUsers = async (req, res) => {
 
 exports.followUser = async (req, res) => {
   try {
-    const userId = req.session.user._id.toString();
+    const userId = req.session?.user?._id;
     const targetUserId = req.params.id;
 
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required",
+      });
+    }
+
     if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
-      return res.status(400).json({ message: "Invalid User ID" });
+      return res.status(400).json({
+        message: "Invalid User ID",
+      });
     }
 
-    if (userId === targetUserId) {
-      return res.status(400).json({ message: "You cannot follow yourself" });
+    const currentUserId = userId.toString();
+    const targetId = targetUserId.toString();
+
+    // Prevent following yourself
+    if (currentUserId === targetId) {
+      return res.status(400).json({
+        message: "You cannot follow yourself",
+      });
     }
 
+    // Check target user exists
     const targetUser = await User.findById(targetUserId);
 
     if (!targetUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
-    const alreadyFollowing = await User.findOne({
+    // Check whether the current user already follows the target
+    const alreadyFollowing = await User.exists({
       _id: userId,
       following: targetUserId,
     });
 
     if (alreadyFollowing) {
-      return res
-        .status(400)
-        .json({ message: "You are already following this user" });
+      return res.status(400).json({
+        message: "You are already following this user",
+        isFollowing: true,
+      });
     }
 
+    // Add target to current user's following list
     await User.findByIdAndUpdate(userId, {
-      $addToSet: { following: targetUserId },
-    });
-    await User.findByIdAndUpdate(targetUserId, {
-      $addToSet: { followers: userId },
+      $addToSet: {
+        following: targetUserId,
+      },
     });
 
-    res.json({ message: "User followed successfully" });
+    // Add current user to target user's followers list
+    await User.findByIdAndUpdate(targetUserId, {
+      $addToSet: {
+        followers: userId,
+      },
+    });
+
+    return res.status(200).json({
+      message: "User followed successfully",
+      isFollowing: true,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("followUser error:", error);
+
+    return res.status(500).json({
+      message: "Failed to follow user",
+      error: error.message,
+    });
   }
 };
 
 exports.unfollowUser = async (req, res) => {
   try {
-    const userId = req.session.user._id;
+    const userId = req.session?.user?._id;
     const targetUserId = req.params.id;
 
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required",
+      });
+    }
+
     if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
-      return res.status(400).json({ message: "Invalid User ID" });
+      return res.status(400).json({
+        message: "Invalid User ID",
+      });
     }
 
-    if (userId === targetUserId) {
-      return res.status(400).json({ message: "You cannot unfollow yourself" });
+    const currentUserId = userId.toString();
+    const targetId = targetUserId.toString();
+
+    // Prevent unfollowing yourself
+    if (currentUserId === targetId) {
+      return res.status(400).json({
+        message: "You cannot unfollow yourself",
+      });
     }
 
+    // Check target user exists
     const targetUser = await User.findById(targetUserId);
+
     if (!targetUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
-    const isFollowing = await User.findOne({
+    // Check whether current user actually follows target
+    const isFollowing = await User.exists({
       _id: userId,
       following: targetUserId,
     });
 
     if (!isFollowing) {
-      return res
-        .status(400)
-        .json({ message: "You are not following this user" });
+      return res.status(400).json({
+        message: "You are not following this user",
+        isFollowing: false,
+      });
     }
+
+    // Remove target from current user's following
     await User.findByIdAndUpdate(userId, {
-      $pull: { following: targetUserId },
+      $pull: {
+        following: targetUserId,
+      },
     });
 
+    // Remove current user from target's followers
     await User.findByIdAndUpdate(targetUserId, {
-      $pull: { followers: userId },
+      $pull: {
+        followers: userId,
+      },
     });
-    res.status(200).json({ message: "User unfollowed successfully" });
+
+    return res.status(200).json({
+      message: "User unfollowed successfully",
+      isFollowing: false,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("unfollowUser error:", error);
+
+    return res.status(500).json({
+      message: "Failed to unfollow user",
+      error: error.message,
+    });
   }
 };
