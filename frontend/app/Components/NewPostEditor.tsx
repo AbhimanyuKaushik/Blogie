@@ -1012,6 +1012,13 @@ const Tiptap = ({
 
     console.log("[CREATE POST SUCCESS]", savedPost);
 
+    const newId = savedPost?._id || savedPost?.id;
+    if (newId) {
+      setDraftPostId(newId);
+      setPostStatus(savedPost?.status || "draft");
+      setLocalUserRole("owner");
+    }
+
     onSave?.(savedPost);
 
     return data;
@@ -1062,6 +1069,7 @@ const Tiptap = ({
 
     setDraftPostId(draftId);
     setPostStatus(savedDraft?.status || "draft");
+    setLocalUserRole("owner");
 
     onDraftCreated?.(savedDraft);
 
