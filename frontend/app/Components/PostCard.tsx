@@ -46,7 +46,20 @@ export default function PostCard({
   const [isLiked, setIsLiked] = useState(!!post.isLiked);
   const [likesCount, setLikesCount] = useState(post.likesCount);
   const [isLoading, setIsLoading] = useState(false);
-
+  const day = new Date(post.createdAt).toLocaleDateString("en-US", {
+    day: "numeric",
+  });
+  const month = new Date(post.createdAt).toLocaleDateString("en-US", {
+    month: "long",
+  });
+  const year = new Date(post.createdAt).toLocaleDateString("en-US", {
+    year: "numeric",
+  });
+  const getOrdinal = (n: any) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
   const handleLike = async () => {
     if (isLoading) return;
 
@@ -146,7 +159,7 @@ export default function PostCard({
         <span className="font-medium text-black">
           {post.author?.username ?? "Unknown"}
         </span>
-        <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+        <span>{`${getOrdinal(day)} ${month} ${year}`}</span>
       </div>
 
       <h2 className="text-xl font-bold">{post.title}</h2>
@@ -165,7 +178,7 @@ export default function PostCard({
             }}
             disabled={isLoading}
             className={`flex items-center gap-1 transition-all ${
-              isLoading ? "opacity-50 cursor-not-allowed" : "hover:text-red-500"
+              isLoading ? "opacity-50 cursor-not-allowed" : ""
             }`}
             aria-label={isLiked ? "Unlike" : "Like"}
           >

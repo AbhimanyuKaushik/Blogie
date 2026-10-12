@@ -651,6 +651,9 @@ const Tiptap = ({
 
   const effectivePostId = postId || draftPostId;
 
+  const effectiveUserRole =
+    currentUserRole || (!postId && draftPostId ? "owner" : undefined);
+
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistCollaborativeTitle = (value: string) => {
@@ -1014,6 +1017,12 @@ const Tiptap = ({
 
     onSave?.(savedPost);
 
+    const newId = savedPost?._id || savedPost?.id;
+    if (newId) {
+      setDraftPostId(newId);
+      setPostStatus(savedPost?.status || "draft");
+    }
+
     return data;
   };
 
@@ -1136,7 +1145,7 @@ const Tiptap = ({
       throw new Error("Post ID is missing.");
     }
 
-    if (currentUserRole !== "owner") {
+    if (effectiveUserRole !== "owner") {
       throw new Error("Only the post owner can publish this post.");
     }
 
@@ -2464,7 +2473,7 @@ const Tiptap = ({
                 </button>
 
                 {effectivePostId &&
-                  currentUserRole === "owner" &&
+                  effectiveUserRole === "owner" &&
                   postStatus === "draft" && (
                     <button
                       type="button"
@@ -2492,7 +2501,7 @@ const Tiptap = ({
                   )}
 
                 {effectivePostId &&
-                  currentUserRole === "owner" &&
+                  effectiveUserRole === "owner" &&
                   postStatus === "published" && (
                     <span className="px-3 py-2 rounded-md bg-green-50 text-green-700 font-medium">
                       Published
@@ -2655,6 +2664,9 @@ const NewPostEditor = (props: NewPostEditorProps) => {
     ...props,
     postId: activePostId,
     initialDocument: activeInitialDocument,
+    currentUserRole:
+      props.currentUserRole ||
+      (activePostId && !props.postId ? "owner" : undefined),
     onDraftCreated: handleDraftCreated,
   };
 
