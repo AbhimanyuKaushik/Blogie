@@ -1,7 +1,7 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { ChangeEvent, FormEvent, useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft,
   Camera,
@@ -45,7 +45,8 @@ type FormData = {
 
 export default function EditProfilePage() {
   const router = useRouter();
-
+  const params = useParams<{ id: string }>();
+  const userId = params.id;
   const [formData, setFormData] = useState<FormData>({
     username: "",
     age: "",
@@ -61,9 +62,42 @@ export default function EditProfilePage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [initialLoading, setInitialLoading] = useState(false);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/profile/me`, {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Failed to load profile");
+
+        const { profile } = await res.json();
+
+        setFormData({
+          username: profile.username || "",
+          age: profile.age != null ? String(profile.age) : "",
+          location: profile.location || "",
+          bio: profile.bio || "",
+          interests: profile.interests || [],
+          instagram: profile.social?.instagram || "",
+          twitter: profile.social?.twitter || "",
+          linkedin: profile.social?.linkedin || "",
+        });
+        setProfileImage(profile.profileImage || "");
+      } catch (err) {
+        console.error(err);
+        setError("Could not load your profile.");
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   /*
    * ---------------------------------------------------------
@@ -139,9 +173,8 @@ export default function EditProfilePage() {
        * endpoint, this request can be connected directly.
        */
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         username: formData.username.trim(),
-        age: formData.age,
         location: formData.location.trim(),
         bio: formData.bio.trim(),
         interests: formData.interests,
@@ -152,20 +185,38 @@ export default function EditProfilePage() {
         },
       };
 
-      console.log("Profile update payload:", payload);
-      console.log("Profile image:", imageFile);
+      // only send age if the user actually entered one
+      if (formData.age !== "") payload.age = Number(formData.age);
 
-      /*
-       * TEMPORARY
-       *
-       * Do not send an invented endpoint to your backend.
-       * Once we inspect your existing profile update controller,
-       * we'll replace this section with the real API call.
-       */
+      const res = await fetch(`${API_BASE_URL}/profile/me`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data?.error || data?.message || "Update failed");
 
-      setSuccess("Profile changes are ready to be saved.");
+      // upload the image separately, if a new one was chosen
+      if (imageFile) {
+        const imgData = new FormData();
+        imgData.append("image", imageFile); // must match upload.single("image")
+
+        const imgRes = await fetch(
+          `${API_BASE_URL}/profile/upload-profile-image`,
+          {
+            method: "PATCH",
+            credentials: "include",
+            body: imgData, // don't set Content-Type here, the browser sets it
+          },
+        );
+        if (!imgRes.ok) throw new Error("Image upload failed");
+      }
+
+      setSuccess("Profile updated!");
+      router.push("/Profile");
     } catch (err) {
       console.error(err);
       setError("Something went wrong. Please try again.");

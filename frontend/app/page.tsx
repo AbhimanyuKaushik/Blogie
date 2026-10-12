@@ -69,7 +69,6 @@ export default function Home() {
   useEffect(() => {
     skipRef.current = skip;
   }, [skip]);
-
   const fetchFeed = useCallback(async (reset = false) => {
     try {
       setLoading(true);

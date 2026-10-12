@@ -158,7 +158,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 aria-label="Change profile picture"
-                onClick={() => router.push("/publicProfile/edit")}
+                onClick={() => router.push(`/Profile/${form.id}/edit`)}
                 className="
                   absolute
                   bottom-3
@@ -207,10 +207,16 @@ export default function ProfilePage() {
               </div>
 
               {/* EDIT BUTTON */}
-
               <button
                 type="button"
-                onClick={() => router.push("/profile/edit")}
+                onClick={() => {
+                  if (!form.id) {
+                    console.error("User ID is missing");
+                    return;
+                  }
+
+                  router.push(`/Profile/${form.id}/edit`);
+                }}
                 className="
                   shrink-0
                   inline-flex

@@ -98,7 +98,6 @@ function Navbar({ onMenuClick }: NavbarProps) {
     }
 
     let cancelled = false;
-
     const loadNotifications = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/notifications`, {
@@ -737,7 +736,7 @@ function Navbar({ onMenuClick }: NavbarProps) {
         ) : (
           <div className="relative">
             <img
-              src={user.profileImage || "/default-avatar.png"}
+              src={user.profileImage}
               alt="User avatar"
               width={40}
               height={40}

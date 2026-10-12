@@ -661,6 +661,9 @@ const Tiptap = ({
 
   const effectivePostId = postId || draftPostId;
 
+  const effectiveUserRole =
+    currentUserRole || (!postId && draftPostId ? "owner" : undefined);
+
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistCollaborativeTitle = (value: string) => {
@@ -1030,6 +1033,12 @@ const Tiptap = ({
     }
 
     onSave?.(savedPost);
+
+    const newId = savedPost?._id || savedPost?.id;
+    if (newId) {
+      setDraftPostId(newId);
+      setPostStatus(savedPost?.status || "draft");
+    }
 
     return data;
   };
@@ -2673,6 +2682,9 @@ const NewPostEditor = (props: NewPostEditorProps) => {
     ...props,
     postId: activePostId,
     initialDocument: activeInitialDocument,
+    currentUserRole:
+      props.currentUserRole ||
+      (activePostId && !props.postId ? "owner" : undefined),
     onDraftCreated: handleDraftCreated,
   };
 
