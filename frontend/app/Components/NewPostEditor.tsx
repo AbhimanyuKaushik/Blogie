@@ -624,6 +624,16 @@ const Tiptap = ({
     null,
   );
 
+  // A post created in this editor belongs to the current user.
+  // Keep that ownership in local state so Publish is available immediately.
+  const [localUserRole, setLocalUserRole] = useState(currentUserRole);
+
+  useEffect(() => {
+    if (currentUserRole) setLocalUserRole(currentUserRole);
+  }, [currentUserRole]);
+
+  const effectiveUserRole = localUserRole;
+
   const [creatingDraft, setCreatingDraft] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<
@@ -1012,6 +1022,13 @@ const Tiptap = ({
 
     console.log("[CREATE POST SUCCESS]", savedPost);
 
+    const newId = savedPost?._id || savedPost?.id;
+    if (newId) {
+      setDraftPostId(newId);
+      setPostStatus(savedPost?.status || "draft");
+      setLocalUserRole("owner");
+    }
+
     onSave?.(savedPost);
 
     return data;
@@ -1062,6 +1079,7 @@ const Tiptap = ({
 
     setDraftPostId(draftId);
     setPostStatus(savedDraft?.status || "draft");
+    setLocalUserRole("owner");
 
     onDraftCreated?.(savedDraft);
 
@@ -1136,7 +1154,7 @@ const Tiptap = ({
       throw new Error("Post ID is missing.");
     }
 
-    if (currentUserRole !== "owner") {
+    if (effectiveUserRole !== "owner") {
       throw new Error("Only the post owner can publish this post.");
     }
 
@@ -1738,11 +1756,11 @@ const Tiptap = ({
         {/* ROLE */}
 
         <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-          {currentUserRole && (
+          {effectiveUserRole && (
             <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 shadow-sm">
-              {currentUserRole === "owner"
+              {effectiveUserRole === "owner"
                 ? "Owner"
-                : currentUserRole === "editor"
+                : effectiveUserRole === "editor"
                   ? "Editor"
                   : "Commenter"}
             </span>
@@ -1762,7 +1780,7 @@ const Tiptap = ({
 
           {postStatus === "draft" &&
             liveblocksExtension &&
-            currentUserRole !== "owner" && (
+            effectiveUserRole !== "owner" && (
               <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 font-medium text-gray-600">
                 Owner publishes
               </span>
@@ -2464,7 +2482,7 @@ const Tiptap = ({
                 </button>
 
                 {effectivePostId &&
-                  currentUserRole === "owner" &&
+                  effectiveUserRole === "owner" &&
                   postStatus === "draft" && (
                     <button
                       type="button"
@@ -2492,7 +2510,7 @@ const Tiptap = ({
                   )}
 
                 {effectivePostId &&
-                  currentUserRole === "owner" &&
+                  effectiveUserRole === "owner" &&
                   postStatus === "published" && (
                     <span className="px-3 py-2 rounded-md bg-green-50 text-green-700 font-medium">
                       Published
